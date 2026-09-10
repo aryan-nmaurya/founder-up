@@ -8,6 +8,20 @@
 \set ON_ERROR_STOP on
 \pset pager off
 
+\if :{?allow_destructive}
+\else
+\echo ''
+\echo 'REFUSING TO RUN.'
+\echo 'This suite truncates auth.users and every profile. It is for a local or'
+\echo 'throwaway database only - never a database with real founders.'
+\echo ''
+\echo 'If this is a scratch database, re-run with:'
+\echo '  psql "$PGURL" -v allow_destructive=1 -f <this file>'
+\echo ''
+\quit
+\endif
+
+
 truncate auth.users cascade;
 truncate public.activity_events, public.webhook_events, public.audit_logs;
 select setval('public.founder_number_seq', 1, false);

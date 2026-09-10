@@ -15,12 +15,6 @@ function reader() {
   return createPublicSupabase();
 }
 
-import {
-  getMockProfileByUsername,
-  getMockVentures,
-  getMockActiveCountries,
-} from "./mock-data";
-import { mockDataEnabled } from "./mock-mode";
 
 export async function getProfileByUsername(
   username: string,
@@ -32,12 +26,9 @@ export async function getProfileByUsername(
       .select("*")
       .eq("username", username.toLowerCase())
       .maybeSingle();
-    if (data) return data as Profile;
-    // A configured database that has no such username is a real 404. Never
-    // answer it with a fabricated person.
-    if (!mockDataEnabled()) return null;
+    return (data as Profile | null) ?? null;
   }
-  return getMockProfileByUsername(username);
+  return null;
 }
 
 export async function getVentures(founderId: string): Promise<Venture[]> {
@@ -49,10 +40,9 @@ export async function getVentures(founderId: string): Promise<Venture[]> {
       .eq("founder_id", founderId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
-    if (data && data.length > 0) return data as Venture[];
-    if (!mockDataEnabled()) return [];
+    return (data ?? []) as Venture[];
   }
-  return getMockVentures(founderId);
+  return [];
 }
 
 /** Owner view - includes hidden ventures. */
@@ -152,12 +142,11 @@ export async function getActiveCountries(): Promise<string[]> {
       // decides whether a country has anyone to show.
       .eq("is_ranked", true)
       .eq("is_suspended", false);
-    if (data && data.length > 0) {
+    if (data) {
       return [...new Set(data.map((r) => (r as { country_code: string }).country_code))];
     }
-    if (!mockDataEnabled()) return [];
   }
-  return getMockActiveCountries();
+  return [];
 }
 
 export async function getAllUsernames(limit = 5000): Promise<

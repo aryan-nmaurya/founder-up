@@ -21,13 +21,6 @@ function reader() {
   return createPublicSupabase();
 }
 
-import {
-  getMockLeaderboardRows,
-  getMockLeaderboardCount,
-  getMockFounderRanks,
-  MOCK_ACTIVITY_EVENTS,
-} from "./mock-data";
-import { mockDataEnabled } from "./mock-mode";
 
 async function fetchLeaderboard(
   period: Period,
@@ -53,9 +46,7 @@ async function fetchLeaderboard(
     }
   }
 
-  return mockDataEnabled()
-    ? getMockLeaderboardRows({ period, country, limit, offset })
-    : [];
+  return [];
 }
 
 /**
@@ -91,9 +82,10 @@ export async function getLeaderboardCount(
       p_period: period,
       p_country: country,
     });
-    if (!error && data != null) return Number(data);
+    if (error) console.error("[leaderboard] count failed:", error.message);
+    else if (data != null) return Number(data);
   }
-  return mockDataEnabled() ? getMockLeaderboardCount(period, country) : 0;
+  return 0;
 }
 
 export async function getFounderRanks(
@@ -106,9 +98,7 @@ export async function getFounderRanks(
     });
     if (!error && data?.length) return data[0] as FounderRanks;
   }
-  return mockDataEnabled()
-    ? ((getMockFounderRanks(founderId) as unknown as FounderRanks) ?? null)
-    : null;
+  return null;
 }
 
 /** Plan §16 - "71 RP to take #5". */
@@ -144,10 +134,8 @@ export async function getRecentActivity(limit = 8): Promise<ActivityEvent[]> {
           .order("created_at", { ascending: false })
           .limit(limit);
         if (error) {
-          return mockDataEnabled() ? MOCK_ACTIVITY_EVENTS.slice(0, limit) : [];
-        }
-        if ((data?.length ?? 0) === 0 && mockDataEnabled()) {
-          return MOCK_ACTIVITY_EVENTS.slice(0, limit);
+          console.error("[activity] failed:", error.message);
+          return [];
         }
         return (data ?? []) as unknown as ActivityEvent[];
       },
@@ -156,7 +144,7 @@ export async function getRecentActivity(limit = 8): Promise<ActivityEvent[]> {
     );
     return cached();
   }
-  return mockDataEnabled() ? MOCK_ACTIVITY_EVENTS.slice(0, limit) : [];
+  return [];
 }
 
 /**

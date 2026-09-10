@@ -2,21 +2,20 @@ import Link from "next/link";
 import { flagFor } from "@/lib/countries";
 import { formatPoints, displayUrl } from "@/lib/format";
 import { FounderAvatar } from "./founder-avatar";
-import { ArrowUp, Clock, Flame } from "lucide-react";
-import type { ExtendedLeaderboardRow } from "@/lib/mock-data";
+import { Clock, Flame } from "lucide-react";
 import type { LeaderboardRow as DbRow } from "@/types/db";
 import { EarlyFounderBadge } from "./early-founder-badge";
 
 interface TopThreeProps {
-  rows: (DbRow | ExtendedLeaderboardRow)[];
+  rows: DbRow[];
 }
 
 export function TopThree({ rows }: TopThreeProps) {
   if (!rows || rows.length === 0) return null;
 
-  const first = rows[0] as ExtendedLeaderboardRow;
-  const second = rows[1] as ExtendedLeaderboardRow | undefined;
-  const third = rows[2] as ExtendedLeaderboardRow | undefined;
+  const first = rows[0];
+  const second = rows[1];
+  const third = rows[2];
 
   // Calculate tension gap between #1 and #2
   const gapBetween1And2 =
@@ -107,7 +106,7 @@ export function TopThree({ rows }: TopThreeProps) {
                     ) : (
                       <>
                         <Clock className="h-3 w-3 text-accent" />
-                        <span>Leading for {first.leading_duration || "8h 42m"}</span>
+                        <span>Current leader</span>
                       </>
                     )}
                   </span>
@@ -122,12 +121,7 @@ export function TopThree({ rows }: TopThreeProps) {
               {formatPoints(first.points)}
               <span className="ml-1 text-[13px] font-bold text-accent">RP</span>
             </div>
-            {first.rank_change_today && first.rank_change_today > 0 ? (
-              <div className="inline-flex items-center gap-1 text-[12px] font-bold text-positive tabular">
-                <ArrowUp className="h-3.5 w-3.5" />
-                <span>{first.rank_change_today} today</span>
-              </div>
-            ) : (
+            {false ? null : (
               <div className="text-[12px] font-semibold text-muted">
                 Current Leader
               </div>
@@ -199,12 +193,6 @@ export function TopThree({ rows }: TopThreeProps) {
                   {formatPoints(second.points)}
                   <span className="ml-1 text-[11px] font-semibold text-subtle">RP</span>
                 </div>
-                {second.rank_change_today && second.rank_change_today > 0 ? (
-                  <div className="inline-flex items-center gap-0.5 text-[11px] font-bold text-positive tabular">
-                    <ArrowUp className="h-3 w-3" />
-                    <span>{second.rank_change_today} today</span>
-                  </div>
-                ) : null}
               </div>
             </div>
           </Link>
@@ -271,12 +259,6 @@ export function TopThree({ rows }: TopThreeProps) {
                   {formatPoints(third.points)}
                   <span className="ml-1 text-[11px] font-semibold text-subtle">RP</span>
                 </div>
-                {third.rank_change_today && third.rank_change_today > 0 ? (
-                  <div className="inline-flex items-center gap-0.5 text-[11px] font-bold text-positive tabular">
-                    <ArrowUp className="h-3 w-3" />
-                    <span>{third.rank_change_today} today</span>
-                  </div>
-                ) : null}
               </div>
             </div>
           </Link>

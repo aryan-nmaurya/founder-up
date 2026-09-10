@@ -14,6 +14,14 @@
 
 set -euo pipefail
 PGURL="${PGURL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}"
+
+# This truncates auth.users and every profile. Never point it at a database
+# with real founders.
+if [ "${ALLOW_DESTRUCTIVE:-}" != "1" ]; then
+  echo "REFUSING TO RUN: this suite truncates all founders."
+  echo "For a local or throwaway database only, re-run with ALLOW_DESTRUCTIVE=1."
+  exit 1
+fi
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 

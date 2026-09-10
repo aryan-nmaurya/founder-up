@@ -4,7 +4,6 @@ import { LeaderboardRow } from "./leaderboard-row";
 import { countryName } from "@/lib/countries";
 import { LEADERBOARD_PAGE_SIZE } from "@/lib/config";
 import type { LeaderboardRow as Row } from "@/types/db";
-import type { ExtendedLeaderboardRow } from "@/lib/mock-data";
 
 export function Leaderboard({
   rows,
@@ -14,7 +13,7 @@ export function Leaderboard({
   shown,
   baseQuery,
 }: {
-  rows: (Row | ExtendedLeaderboardRow)[];
+  rows: Row[];
   country: string | null;
   period: "ALL_TIME" | "TODAY";
   total: number;

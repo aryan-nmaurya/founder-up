@@ -63,14 +63,9 @@ redirect URL. Email magic links work out of the box.
 npm run dev
 ```
 
-Optionally seed obviously-fake local data:
-
-```bash
-npm run seed
-```
-
-The seed refuses to run against a non-local Supabase. Plan §68: never launch
-with fabricated founders or payments.
+There is no seed data and no demo fixtures. A fresh database renders the real
+empty state: an empty leaderboard and `0 / 50` Early Founder spots claimed.
+Plan §68 - never launch with fabricated founders, payments or ranks.
 
 ---
 
@@ -148,20 +143,6 @@ keeps their number.
 Tests: `supabase/tests/early_founder_test.sql` and
 `supabase/tests/concurrency_test.sh` (the latter runs the 49/50/51 race and a
 25-way burst over real parallel connections).
-
----
-
-## Demo fixtures
-
-`src/lib/mock-data.ts` holds demo founders for design work. They are **opt-in**:
-
-```bash
-NEXT_PUBLIC_USE_MOCK_DATA=true   # only for local design work
-```
-
-Without the flag they are used only when Supabase is unconfigured. A configured
-database with no founders renders the real empty state. Never enable this on a
-deployment — plan §68: never fabricate founders, payments or ranks.
 
 ---
 
@@ -256,7 +237,6 @@ src/
   lib/                        auth, db, ranking, payments, razorpay, geo,
                               validation, rate-limit, webhooks
 supabase/migrations/          schema, functions, RLS, storage
-scripts/seed-dev.mts           local demo data
 ```
 
 ---
@@ -292,8 +272,14 @@ rounding, forced refunds, double refunds, daily reset, venture caps, country
 cooldown and reserved usernames. Run it against a scratch Postgres:
 
 ```bash
-psql "$DATABASE_URL" -f supabase/tests/ranking_test.sql
+psql "$DATABASE_URL" -v allow_destructive=1 -f supabase/tests/ranking_test.sql
+psql "$DATABASE_URL" -v allow_destructive=1 -f supabase/tests/early_founder_test.sql
+ALLOW_DESTRUCTIVE=1 bash supabase/tests/concurrency_test.sh
 ```
+
+Every suite truncates all founders, so each refuses to run without that explicit
+opt-in. Point them at a local or throwaway database only — never at a database
+with real founders.
 
 ## What is deliberately not built
 

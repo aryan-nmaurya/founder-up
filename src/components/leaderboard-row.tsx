@@ -2,19 +2,15 @@ import Link from "next/link";
 import { flagFor } from "@/lib/countries";
 import { formatPoints, displayUrl } from "@/lib/format";
 import { FounderAvatar } from "./founder-avatar";
-import { ArrowUp } from "lucide-react";
-import type { ExtendedLeaderboardRow } from "@/lib/mock-data";
 import type { LeaderboardRow as DbRow } from "@/types/db";
 import { EarlyFounderBadge } from "./early-founder-badge";
 
 interface LeaderboardRowProps {
-  row: DbRow | ExtendedLeaderboardRow;
+  row: DbRow;
   index?: number;
 }
 
 export function LeaderboardRow({ row }: LeaderboardRowProps) {
-  const extended = row as ExtendedLeaderboardRow;
-  const movement = extended.rank_change_today;
 
   return (
     <li className="group list-none">
@@ -100,16 +96,6 @@ export function LeaderboardRow({ row }: LeaderboardRowProps) {
               <span className="ml-1 text-[12px] font-semibold text-subtle">RP</span>
             </div>
 
-            {movement !== undefined && movement !== null && movement > 0 ? (
-              <div className="mt-0.5 inline-flex items-center gap-0.5 text-[11px] font-bold text-positive tabular">
-                <ArrowUp className="h-3 w-3" />
-                <span>{movement} today</span>
-              </div>
-            ) : movement !== undefined && movement === 0 ? (
-              <div className="mt-0.5 text-[11px] font-medium text-subtle">
-                steady
-              </div>
-            ) : null}
           </div>
         </div>
       </Link>
