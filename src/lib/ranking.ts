@@ -27,6 +27,7 @@ import {
   getMockFounderRanks,
   MOCK_ACTIVITY_EVENTS,
 } from "./mock-data";
+import { mockDataEnabled } from "./mock-mode";
 
 async function fetchLeaderboard(
   period: Period,
@@ -43,13 +44,18 @@ async function fetchLeaderboard(
       p_offset: offset,
     });
 
-    if (!error && data && data.length > 0) {
-      return data as LeaderboardRow[];
+    if (error) {
+      console.error(`[leaderboard] ${fn} failed:`, error.message);
+    } else {
+      // A real answer wins, including an empty one. An empty leaderboard is a
+      // legitimate state and must never be papered over with fixtures.
+      return (data ?? []) as LeaderboardRow[];
     }
   }
 
-  // Fallback to rich mock founders if database is unseeded or offline
-  return getMockLeaderboardRows({ period, country, limit, offset });
+  return mockDataEnabled()
+    ? getMockLeaderboardRows({ period, country, limit, offset })
+    : [];
 }
 
 /**
@@ -85,11 +91,9 @@ export async function getLeaderboardCount(
       p_period: period,
       p_country: country,
     });
-    if (!error && data != null && Number(data) > 0) {
-      return Number(data);
-    }
+    if (!error && data != null) return Number(data);
   }
-  return getMockLeaderboardCount(period, country);
+  return mockDataEnabled() ? getMockLeaderboardCount(period, country) : 0;
 }
 
 export async function getFounderRanks(
@@ -102,7 +106,9 @@ export async function getFounderRanks(
     });
     if (!error && data?.length) return data[0] as FounderRanks;
   }
-  return (getMockFounderRanks(founderId) as unknown as FounderRanks) ?? null;
+  return mockDataEnabled()
+    ? ((getMockFounderRanks(founderId) as unknown as FounderRanks) ?? null)
+    : null;
 }
 
 /** Plan §16 - "71 RP to take #5". */
@@ -137,15 +143,20 @@ export async function getRecentActivity(limit = 8): Promise<ActivityEvent[]> {
           )
           .order("created_at", { ascending: false })
           .limit(limit);
-        if (error || !data || data.length === 0) return MOCK_ACTIVITY_EVENTS.slice(0, limit);
-        return data as unknown as ActivityEvent[];
+        if (error) {
+          return mockDataEnabled() ? MOCK_ACTIVITY_EVENTS.slice(0, limit) : [];
+        }
+        if ((data?.length ?? 0) === 0 && mockDataEnabled()) {
+          return MOCK_ACTIVITY_EVENTS.slice(0, limit);
+        }
+        return (data ?? []) as unknown as ActivityEvent[];
       },
       ["activity", String(limit)],
       { revalidate: LEADERBOARD_CACHE_SECONDS, tags: [LEADERBOARD_TAG] },
     );
     return cached();
   }
-  return MOCK_ACTIVITY_EVENTS.slice(0, limit);
+  return mockDataEnabled() ? MOCK_ACTIVITY_EVENTS.slice(0, limit) : [];
 }
 
 /**

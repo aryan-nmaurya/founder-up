@@ -20,6 +20,7 @@ import {
   getMockVentures,
   getMockActiveCountries,
 } from "./mock-data";
+import { mockDataEnabled } from "./mock-mode";
 
 export async function getProfileByUsername(
   username: string,
@@ -32,6 +33,9 @@ export async function getProfileByUsername(
       .eq("username", username.toLowerCase())
       .maybeSingle();
     if (data) return data as Profile;
+    // A configured database that has no such username is a real 404. Never
+    // answer it with a fabricated person.
+    if (!mockDataEnabled()) return null;
   }
   return getMockProfileByUsername(username);
 }
@@ -46,6 +50,7 @@ export async function getVentures(founderId: string): Promise<Venture[]> {
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     if (data && data.length > 0) return data as Venture[];
+    if (!mockDataEnabled()) return [];
   }
   return getMockVentures(founderId);
 }
@@ -143,11 +148,14 @@ export async function getActiveCountries(): Promise<string[]> {
     const { data } = await supabase
       .from("profiles")
       .select("country_code")
-      .gt("total_rank_points", 0)
+      // Early Founders sit on the board at 0 RP, so eligibility - not points -
+      // decides whether a country has anyone to show.
+      .eq("is_ranked", true)
       .eq("is_suspended", false);
     if (data && data.length > 0) {
       return [...new Set(data.map((r) => (r as { country_code: string }).country_code))];
     }
+    if (!mockDataEnabled()) return [];
   }
   return getMockActiveCountries();
 }
