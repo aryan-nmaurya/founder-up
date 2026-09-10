@@ -97,6 +97,74 @@ and appear in search.
 
 ---
 
+## Early Founders
+
+The first 50 founders to complete a public profile receive a permanent
+`founder_number` and free leaderboard eligibility.
+
+```
+Early Founder #17        <- permanent, never changes, never reused
+#6 India · #42 Global    <- live rank, moves with Rank Points
+```
+
+**How the number is issued.** A Postgres sequence, wired as the column default,
+with a `BEFORE INSERT` trigger deriving `is_early_founder` and `is_ranked`:
+
+```sql
+founder_number  bigint not null default nextval('founder_number_seq')
+is_early_founder = founder_number <= 50   -- derived, never supplied
+is_ranked        = is_early_founder or <a payment captured>
+```
+
+Putting the rules in a trigger means they hold for *every* insert path — the
+onboarding RPC, the service role, a seed script, a psql session — not just the
+one written correctly. `nextval()` is atomic and non-transactional, so:
+
+- two simultaneous completions can never receive the same number;
+- a deleted account never frees its number (delete #12 at #73, the next is #74);
+- authenticating alone reaches none of this, so signing in consumes nothing.
+
+`create_founder_profile` is idempotent. A retried request returns the existing
+profile without drawing a new number, serialised by a per-user advisory lock so
+a racing retry cannot burn one either.
+
+**Free ranking, no fake payments.** Early Founders appear on the leaderboard at
+0 RP through `is_ranked`. No payment row, no ledger entry and no Rank Points are
+fabricated. They climb by buying Rank Points like everyone else.
+
+**#51 onward** start Unranked with a fully public, functional profile, and enter
+the board from ₹100 / $1.
+
+**The counter** on the homepage reads the sequence, so it flips to the claimed
+state on its own at #50 — there is no admin toggle. It counts issued numbers
+rather than surviving profiles, because a deleted account must not reopen a
+spot.
+
+**Immutability.** `founder_number` and `is_early_founder` are absent from the
+`authenticated` UPDATE grant and additionally blocked by trigger, so neither a
+client nor a service-role mistake can rewrite history. Suspending a founder
+keeps their number.
+
+Tests: `supabase/tests/early_founder_test.sql` and
+`supabase/tests/concurrency_test.sh` (the latter runs the 49/50/51 race and a
+25-way burst over real parallel connections).
+
+---
+
+## Demo fixtures
+
+`src/lib/mock-data.ts` holds demo founders for design work. They are **opt-in**:
+
+```bash
+NEXT_PUBLIC_USE_MOCK_DATA=true   # only for local design work
+```
+
+Without the flag they are used only when Supabase is unconfigured. A configured
+database with no founders renders the real empty state. Never enable this on a
+deployment — plan §68: never fabricate founders, payments or ranks.
+
+---
+
 ## Money path
 
 The browser can never award Rank Points. Every step is server-side.
