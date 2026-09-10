@@ -1,26 +1,93 @@
 @import "tailwindcss";
 
+/*
+ * FounderUp design system.
+ * Light mode only. Warm neutral surfaces, refined typography, subtle borders,
+ * restrained coral accent, and focused centered layout (1100–1180px).
+ */
+
+@theme {
+  --color-bg: #FCFBF9;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #F7F5F0;
+  --color-fg: #171717;
+  --color-muted: #737373;
+  --color-subtle: #949089;
+  --color-border: #EAE7E2;
+  --color-border-strong: #D8D4CC;
+  --color-accent: #F26A4F;
+  --color-accent-hover: #E2573C;
+  --color-accent-subtle: #FDF3F0;
+  --color-positive: #0F8B4C;
+  --color-negative: #D93829;
+  --color-focus: #F26A4F;
+
+  --font-sans: var(--font-manrope), Manrope, Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Spec: Centered content area around 1100–1180px */
+  --container-page: 1140px;
+  --container-narrow: 840px;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Plan §35: subtle interaction only, 100-150ms. */
+a,
+button {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Plan §36: 16px minimum inputs on mobile to stop iOS zoom. */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+@media (min-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
