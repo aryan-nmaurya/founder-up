@@ -89,7 +89,7 @@ export default async function AdminFoundersPage({
                 </p>
                 {/* Founder numbers are historical identifiers: shown, never edited. */}
                 <p className="mt-0.5 text-[13px] text-muted tabular">
-                  Founder #{profile.founder_number} ·{" "}
+                  No. {profile.founder_number} ·{" "}
                   {formatPoints(profile.total_rank_points)} RP · completed{" "}
                   {formatDate(profile.profile_completed_at ?? profile.created_at)}
                 </p>

@@ -3,11 +3,14 @@ import { cn } from "@/lib/cn";
 import { EARLY_FOUNDER_LIMIT } from "@/lib/config";
 
 /**
- * The permanent Early Founder marker.
+ * Archival Early Founder marker.
  *
- * Kept visually secondary to the live leaderboard rank next to it: this is a
- * historical identity that never changes, not a position that moves. Render it
- * only when `profile.is_early_founder` is true.
+ * Subtle, collectible status label with a fine border. Kept visually secondary
+ * to the live leaderboard rank beside it: this is a permanent identity, not a
+ * position that moves.
+ *
+ * The wording is fixed at "Early Founder #N" by product spec - not "Founding
+ * #N", "Founder #N" or "Member #N". Please don't rename it.
  */
 export function EarlyFounderBadge({
   number,
@@ -22,14 +25,14 @@ export function EarlyFounderBadge({
     <span
       title={`One of the first ${EARLY_FOUNDER_LIMIT} founders on FounderUp`}
       className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap rounded-full",
-        "border border-accent/20 bg-accent-subtle font-bold text-accent",
-        size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-0.5 text-[11px]",
+        "inline-flex items-center gap-1 whitespace-nowrap rounded-md font-semibold tabular",
+        "border border-accent/20 bg-accent-subtle text-accent",
+        size === "sm" ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-[11px]",
         className,
       )}
     >
       <Sparkles className={size === "sm" ? "h-2.5 w-2.5" : "h-3 w-3"} />
-      Early Founder <span className="tabular">#{number}</span>
+      <span>Early Founder #{number}</span>
     </span>
   );
 }
