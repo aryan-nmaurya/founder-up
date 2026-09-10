@@ -1,7 +1,6 @@
 import type { ActivityEvent, LeaderboardRow, Profile, Venture } from "@/types/db";
 
 export interface ExtendedLeaderboardRow extends LeaderboardRow {
-  is_founding_50?: boolean;
   rank_change_today?: number; // e.g. +3, -1, 0, or null for new
   leading_duration?: string; // e.g. "8h 42m" for #1
   gap_to_next?: number; // RP gap to next rank or #1
@@ -10,8 +9,8 @@ export interface ExtendedLeaderboardRow extends LeaderboardRow {
 export const MOCK_COMMUNITY_STATS = {
   totalFounders: 186,
   onlineNow: 24,
-  founding50Claimed: 37,
-  founding50Total: 50,
+  // Early Founder counts come from the database (early_founder_status),
+  // never from here - a hardcoded tally would misreport availability.
 };
 
 export const MOCK_FOUNDERS_DATA: Array<{
@@ -29,7 +28,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
   contact_type: "WEBSITE" | "X" | "LINKEDIN" | "EMAIL";
   contact_value: string | null;
   is_verified: boolean;
-  is_founding_50: boolean;
+  is_early_founder: boolean;
   all_time_points: number;
   today_points: number;
   rank_change_today: number;
@@ -57,7 +56,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "X",
     contact_value: "alexmorgan",
     is_verified: true,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 12480,
     today_points: 4400,
     rank_change_today: 0,
@@ -94,7 +93,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "WEBSITE",
     contact_value: null,
     is_verified: true,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 12300,
     today_points: 3950,
     rank_change_today: 1,
@@ -123,7 +122,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "X",
     contact_value: "aryansharma",
     is_verified: true,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 11850,
     today_points: 3100,
     rank_change_today: 2,
@@ -159,7 +158,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "LINKEDIN",
     contact_value: "marcusvance",
     is_verified: true,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 9420,
     today_points: 1800,
     rank_change_today: -1,
@@ -188,7 +187,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "EMAIL",
     contact_value: "elena@kohlen.earth",
     is_verified: true,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 8750,
     today_points: 1250,
     rank_change_today: 3,
@@ -217,7 +216,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "X",
     contact_value: "rahulverma",
     is_verified: false,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 7600,
     today_points: 2100,
     rank_change_today: 4,
@@ -246,7 +245,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "WEBSITE",
     contact_value: null,
     is_verified: true,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 6890,
     today_points: 800,
     rank_change_today: -2,
@@ -275,7 +274,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "LINKEDIN",
     contact_value: "priyanair",
     is_verified: true,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 5400,
     today_points: 1500,
     rank_change_today: 1,
@@ -304,7 +303,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "X",
     contact_value: "lucasdubois",
     is_verified: false,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 4950,
     today_points: 450,
     rank_change_today: 0,
@@ -333,7 +332,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "X",
     contact_value: "anikapatel",
     is_verified: true,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 4320,
     today_points: 920,
     rank_change_today: 5,
@@ -362,7 +361,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "WEBSITE",
     contact_value: null,
     is_verified: true,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 3880,
     today_points: 600,
     rank_change_today: -1,
@@ -391,7 +390,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "X",
     contact_value: "oliverlind",
     is_verified: false,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 3150,
     today_points: 350,
     rank_change_today: 2,
@@ -420,7 +419,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "WEBSITE",
     contact_value: null,
     is_verified: true,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 2900,
     today_points: 750,
     rank_change_today: 3,
@@ -449,7 +448,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "X",
     contact_value: "siddharthrao",
     is_verified: false,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 2450,
     today_points: 250,
     rank_change_today: 0,
@@ -478,7 +477,7 @@ export const MOCK_FOUNDERS_DATA: Array<{
     contact_type: "WEBSITE",
     contact_value: null,
     is_verified: true,
-    is_founding_50: true,
+    is_early_founder: true,
     all_time_points: 2100,
     today_points: 500,
     rank_change_today: 1,
@@ -569,6 +568,11 @@ export const MOCK_ACTIVITY_EVENTS: ActivityEvent[] = [
   },
 ];
 
+/** Stable stand-in for founder_number, keyed to fixture order. */
+const MOCK_FOUNDER_NUMBERS = new Map(
+  MOCK_FOUNDERS_DATA.map((f, index) => [f.id, index + 1] as const),
+);
+
 export function getMockLeaderboardRows({
   period = "ALL_TIME",
   country = null,
@@ -618,7 +622,9 @@ export function getMockLeaderboardRows({
       venture_url: primaryVenture?.url ?? null,
       points,
       is_verified: founder.is_verified,
-      is_founding_50: founder.is_founding_50,
+      // Position in the fixture list stands in for the real sequence value.
+      founder_number: MOCK_FOUNDER_NUMBERS.get(founder.id) ?? 0,
+      is_early_founder: founder.is_early_founder,
       rank_change_today: founder.rank_change_today,
       leading_duration: rank === 1 ? founder.leading_duration ?? "8h 42m" : undefined,
       gap_to_next: gapToNext,
@@ -671,7 +677,7 @@ export function getMockProfileByUsername(username: string): Profile | null {
     today_rank_points: f.today_points,
     created_at: new Date(Date.now() - 30 * 86400 * 1000).toISOString(),
     updated_at: new Date().toISOString(),
-    is_founding_50: f.is_founding_50,
+    is_early_founder: f.is_early_founder,
   } as unknown as Profile;
 }
 

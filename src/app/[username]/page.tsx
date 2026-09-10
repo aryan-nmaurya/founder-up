@@ -18,7 +18,8 @@ import { getCurrentProfile } from "@/lib/auth";
 import { countryName, flagFor } from "@/lib/countries";
 import { formatPoints, displayUrl } from "@/lib/format";
 import { APP_NAME, APP_URL } from "@/lib/config";
-import { ArrowLeft, ExternalLink, Sparkles } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
+import { EarlyFounderBadge } from "@/components/early-founder-badge";
 
 type Params = Promise<{ username: string }>;
 
@@ -89,8 +90,6 @@ export default async function FounderProfilePage({ params }: { params: Params })
     { label: "GitHub", url: profile.github_url, type: "GITHUB" as const },
   ].filter((s) => Boolean(s.url));
 
-  const isFounding50 = (profile as unknown as { is_founding_50?: boolean }).is_founding_50 ?? true;
-
   return (
     <div className="mx-auto max-w-(--container-narrow) py-2 sm:py-6">
       {!isOwner ? <ProfileViewTracker founderId={profile.id} /> : null}
@@ -144,11 +143,8 @@ export default async function FounderProfilePage({ params }: { params: Params })
                 <span className="text-[20px] leading-none" title={profile.country_code}>
                   {flagFor(profile.country_code)}
                 </span>
-                {isFounding50 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-accent-subtle border border-accent/20 px-2.5 py-0.5 text-[11px] font-bold text-accent">
-                    <Sparkles className="h-3 w-3" />
-                    Founding 50
-                  </span>
+                {profile.is_early_founder && (
+                  <EarlyFounderBadge number={profile.founder_number} />
                 )}
               </div>
 
@@ -175,6 +171,16 @@ export default async function FounderProfilePage({ params }: { params: Params })
                   globalRank={ranks?.global_rank ?? null}
                   countryRank={ranks?.country_rank ?? null}
                   countryCode={profile.country_code}
+                  cta={
+                    isOwner ? (
+                      <Link
+                        href="/dashboard"
+                        className="inline-flex h-7 items-center rounded-lg bg-fg px-2.5 text-[12px] font-semibold text-white transition-colors hover:bg-black"
+                      >
+                        Get ranked
+                      </Link>
+                    ) : null
+                  }
                 />
               </div>
               <span className="mt-1 text-[13px] font-extrabold text-fg tabular">

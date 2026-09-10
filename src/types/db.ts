@@ -51,6 +51,17 @@ export type Profile = {
   contact_value: string | null;
   total_rank_points: number;
   rank_reached_at: string;
+
+  /**
+   * Early Founder identity. Permanent, sequential, never reused, and assigned
+   * only when a valid public profile is created. See migration 0006.
+   */
+  founder_number: number;
+  is_early_founder: boolean;
+  /** On the leaderboard: true for Early Founders, or once a payment captures. */
+  is_ranked: boolean;
+  profile_completed_at: string | null;
+
   is_verified: boolean;
   is_suspended: boolean;
   is_admin: boolean;
@@ -84,6 +95,8 @@ export type LeaderboardRow = {
   is_verified: boolean;
   venture_name: string | null;
   venture_url: string | null;
+  founder_number: number;
+  is_early_founder: boolean;
 };
 
 export type SearchRow = {
@@ -96,6 +109,9 @@ export type SearchRow = {
   points: number;
   is_verified: boolean;
   venture_name: string | null;
+  founder_number: number;
+  is_early_founder: boolean;
+  is_ranked: boolean;
 };
 
 export type FounderRanks = {
@@ -106,6 +122,9 @@ export type FounderRanks = {
   total_points: number;
   today_points: number;
   country_code: string;
+  is_ranked: boolean;
+  founder_number: number;
+  is_early_founder: boolean;
 };
 
 export type NextRankGap = {

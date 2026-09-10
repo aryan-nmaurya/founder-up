@@ -5,7 +5,7 @@ import { APP_NAME } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: `Rules & How Ranking Works — ${APP_NAME}`,
-  description: "Complete rules, Rank Points calculation, Founding 50 details, and fair competition guidelines.",
+  description: "Complete rules, Rank Points calculation, Early Founder details, and fair competition guidelines.",
 };
 
 export default function RulesPage() {
@@ -43,10 +43,10 @@ export default function RulesPage() {
         <div className="rounded-2xl border border-border bg-white p-6 shadow-2xs space-y-2">
           <div className="flex items-center gap-2 text-accent">
             <Sparkles className="h-5 w-5" />
-            <h2 className="text-[16px] font-bold text-fg">The Founding 50</h2>
+            <h2 className="text-[16px] font-bold text-fg">Early Founders</h2>
           </div>
           <p className="text-[14px] leading-relaxed text-muted">
-            The first 50 founders who complete their profiles receive complimentary ranked entry without payment. After spot #50 is claimed, new profiles can join for free and enter the ranked board from ₹100 or $1.
+            The first 50 founders to complete a public profile become Early Founders and enter the leaderboard without paying. Each keeps a permanent number, Early Founder #1 to #50, which never changes and is never reissued. They start with zero Rank Points and climb the same way everyone else does. After #50 is claimed, profiles remain free and the ranked board is entered from ₹100 or $1.
           </p>
         </div>
 

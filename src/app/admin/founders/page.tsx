@@ -4,6 +4,7 @@ import { requireAdminSupabase } from "@/lib/supabase/admin";
 import { AdminForm, SubmitButton } from "@/components/admin-form";
 import { adjustPointsAction, setProfileFlagAction } from "@/app/admin/actions";
 import { PageHeader, Badge } from "@/components/ui/misc";
+import { EarlyFounderBadge } from "@/components/early-founder-badge";
 import { Input } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatPoints } from "@/lib/format";
@@ -78,13 +79,19 @@ export default async function AdminFoundersPage({
                   </Link>
                   <span className="text-[13px] text-muted">@{profile.username}</span>
                   <span className="text-[13px]">{flagFor(profile.country_code)}</span>
+                  {profile.is_early_founder ? (
+                    <EarlyFounderBadge number={profile.founder_number} size="sm" />
+                  ) : null}
+                  {!profile.is_ranked ? <Badge>Unranked</Badge> : null}
                   {profile.is_suspended ? <Badge tone="negative">Suspended</Badge> : null}
                   {profile.is_verified ? <Badge tone="positive">Verified</Badge> : null}
                   {profile.is_admin ? <Badge>Admin</Badge> : null}
                 </p>
+                {/* Founder numbers are historical identifiers: shown, never edited. */}
                 <p className="mt-0.5 text-[13px] text-muted tabular">
-                  {formatPoints(profile.total_rank_points)} RP · joined{" "}
-                  {formatDate(profile.created_at)}
+                  Founder #{profile.founder_number} ·{" "}
+                  {formatPoints(profile.total_rank_points)} RP · completed{" "}
+                  {formatDate(profile.profile_completed_at ?? profile.created_at)}
                 </p>
               </div>
 

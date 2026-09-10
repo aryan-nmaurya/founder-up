@@ -20,12 +20,20 @@ export default function AboutPage() {
         country, see what they are working on, and contact them directly.
       </P>
 
-      <H2>The Founding 50</H2>
+      <H2>Early Founders</H2>
       <P>
-        The first 50 founders who complete their profile become the Founding 50
-        and receive initial ranking without payment. Once those 50 spots are
-        filled, new founders can always create profiles for free, entering the
-        ranked board from ₹100 / $1.
+        The first 50 founders to complete a public profile become Early Founders.
+        Each keeps a permanent number — Early Founder #1 through #50 — shown on
+        their profile alongside their live rank. The number is assigned when the
+        profile is created, never changes, and is never reissued if someone
+        leaves.
+      </P>
+      <P>
+        Early Founders enter the leaderboard without paying. They hold no Rank
+        Points until they buy some, so they start at the bottom of the board and
+        climb the same way everyone else does. Once all 50 numbers are issued,
+        profiles stay free for everyone and the ranked board is entered from
+        ₹100 / $1.
       </P>
 
       <H2>What Rank Points mean</H2>

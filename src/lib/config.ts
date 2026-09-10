@@ -43,6 +43,15 @@ export const USD_TO_INR_ESTIMATE = Number(
   process.env.NEXT_PUBLIC_USD_INR_ESTIMATE ?? 88,
 );
 
+/**
+ * Early Founder programme. The first 50 founders to complete a public profile
+ * get a permanent number and free leaderboard eligibility.
+ *
+ * This mirrors public.early_founder_limit() in migration 0006. The database is
+ * the authority - this constant is only for copy and client-side display.
+ */
+export const EARLY_FOUNDER_LIMIT = 50;
+
 /** Plan §11 */
 export const MAX_VENTURES_PER_FOUNDER = 5;
 

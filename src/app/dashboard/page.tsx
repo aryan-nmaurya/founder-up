@@ -8,12 +8,13 @@ import { getSessionUser } from "@/lib/auth";
 import { isRazorpayConfigured } from "@/lib/razorpay";
 import { BoostDialog } from "@/components/boost-dialog";
 import { FounderRank } from "@/components/founder-rank";
+import { EarlyFounderBadge } from "@/components/early-founder-badge";
 import { Divider, Notice, Stat } from "@/components/ui/misc";
 import { TrackEvent } from "@/components/track-event";
 import { ButtonLink } from "@/components/ui/button";
 import { formatDate, formatMoney, formatPoints } from "@/lib/format";
 import { flagFor } from "@/lib/countries";
-import type { Currency } from "@/lib/config";
+import { MIN_AMOUNT_SUBUNIT, type Currency } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Your dashboard",
@@ -65,6 +66,12 @@ export default async function DashboardPage({
           Your FounderUp
         </h1>
 
+        {profile.is_early_founder ? (
+          <div className="mt-2">
+            <EarlyFounderBadge number={profile.founder_number} />
+          </div>
+        ) : null}
+
         <div className="mt-2">
           <FounderRank
             globalRank={ranks?.global_rank ?? null}
@@ -105,9 +112,11 @@ export default async function DashboardPage({
               </>
             ) : null}
           </p>
-        ) : profile.total_rank_points === 0 ? (
+        ) : !profile.is_ranked ? (
           <p className="mt-3 text-[14px] text-muted">
-            You&apos;re not ranked yet. Boost with ₹100 to enter FounderUp.
+            You&apos;re Unranked. Get ranked from{" "}
+            {formatMoney(MIN_AMOUNT_SUBUNIT.INR, "INR")} /{" "}
+            {formatMoney(MIN_AMOUNT_SUBUNIT.USD, "USD")} to enter the leaderboard.
           </p>
         ) : null}
 

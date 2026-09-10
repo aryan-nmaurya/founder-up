@@ -69,7 +69,7 @@ export default async function SearchPage({
                     ) : null}
                   </div>
                   <span className="shrink-0 text-[14px] tabular text-muted">
-                    {row.points > 0 ? `${formatPoints(row.points)} RP` : "Unranked"}
+                    {row.is_ranked ? `${formatPoints(row.points)} RP` : "Unranked"}
                   </span>
                 </Link>
               </li>

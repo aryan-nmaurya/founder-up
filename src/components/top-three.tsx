@@ -2,9 +2,10 @@ import Link from "next/link";
 import { flagFor } from "@/lib/countries";
 import { formatPoints, displayUrl } from "@/lib/format";
 import { FounderAvatar } from "./founder-avatar";
-import { ArrowUp, Clock, Flame, Sparkles } from "lucide-react";
+import { ArrowUp, Clock, Flame } from "lucide-react";
 import type { ExtendedLeaderboardRow } from "@/lib/mock-data";
 import type { LeaderboardRow as DbRow } from "@/types/db";
+import { EarlyFounderBadge } from "./early-founder-badge";
 
 interface TopThreeProps {
   rows: (DbRow | ExtendedLeaderboardRow)[];
@@ -73,11 +74,8 @@ export function TopThree({ rows }: TopThreeProps) {
                     ✓
                   </span>
                 ) : null}
-                {first.is_founding_50 ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle border border-border px-2.5 py-0.5 text-[10px] font-bold text-muted">
-                    <Sparkles className="h-2.5 w-2.5 text-accent" />
-                    Founding 50
-                  </span>
+                {first.is_early_founder ? (
+                  <EarlyFounderBadge number={first.founder_number} size="sm" />
                 ) : null}
               </div>
 
@@ -170,6 +168,9 @@ export function TopThree({ rows }: TopThreeProps) {
                   {second.is_verified && (
                     <span className="text-accent text-[11px] font-bold">✓</span>
                   )}
+                  {second.is_early_founder ? (
+                    <EarlyFounderBadge number={second.founder_number} size="sm" />
+                  ) : null}
                 </div>
 
                 {second.headline && (
@@ -239,6 +240,9 @@ export function TopThree({ rows }: TopThreeProps) {
                   {third.is_verified && (
                     <span className="text-accent text-[11px] font-bold">✓</span>
                   )}
+                  {third.is_early_founder ? (
+                    <EarlyFounderBadge number={third.founder_number} size="sm" />
+                  ) : null}
                 </div>
 
                 {third.headline && (

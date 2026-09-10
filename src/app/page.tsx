@@ -6,7 +6,7 @@ import { ActivityFeed } from "@/components/activity-feed";
 import { DailyReset } from "@/components/daily-reset";
 import { HowItWorks } from "@/components/how-it-works";
 import { HeroSection } from "@/components/hero-section";
-import { Founding50Status } from "@/components/founding-50-status";
+import { EarlyFounderSpots } from "@/components/early-founder-spots";
 import { TrackEvent } from "@/components/track-event";
 import {
   getLeaderboard,
@@ -15,6 +15,7 @@ import {
   type Period,
 } from "@/lib/ranking";
 import { getActiveCountries } from "@/lib/db";
+import { getEarlyFounderStatus } from "@/lib/early-founder";
 import { getCurrentProfile } from "@/lib/auth";
 import { isValidCountry, countryName } from "@/lib/countries";
 import { LEADERBOARD_PAGE_SIZE } from "@/lib/config";
@@ -48,13 +49,15 @@ export default async function HomePage({
     100,
   );
 
-  const [rows, total, activity, activeCountries, profile] = await Promise.all([
-    getLeaderboard({ period, country, limit }),
-    getLeaderboardCount(period, country),
-    getRecentActivity(6),
-    getActiveCountries(),
-    getCurrentProfile(),
-  ]);
+  const [rows, total, activity, activeCountries, profile, earlyFounders] =
+    await Promise.all([
+      getLeaderboard({ period, country, limit }),
+      getLeaderboardCount(period, country),
+      getRecentActivity(6),
+      getActiveCountries(),
+      getCurrentProfile(),
+      getEarlyFounderStatus(),
+    ]);
 
   const query = new URLSearchParams();
   if (period === "TODAY") query.set("period", "today");
@@ -71,8 +74,8 @@ export default async function HomePage({
       {/* Main Competitive Hero */}
       <HeroSection profile={profile} />
 
-      {/* Tasteful Founding 50 Status Launch Banner */}
-      <Founding50Status claimed={37} total={50} />
+      {/* Early Founder availability - counted in the database, not hardcoded. */}
+      <EarlyFounderSpots status={earlyFounders} />
 
       {/* Leaderboard Section */}
       <section id="leaderboard" className="scroll-mt-6 space-y-4">

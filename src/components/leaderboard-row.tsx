@@ -2,9 +2,10 @@ import Link from "next/link";
 import { flagFor } from "@/lib/countries";
 import { formatPoints, displayUrl } from "@/lib/format";
 import { FounderAvatar } from "./founder-avatar";
-import { ArrowUp, Sparkles } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import type { ExtendedLeaderboardRow } from "@/lib/mock-data";
 import type { LeaderboardRow as DbRow } from "@/types/db";
+import { EarlyFounderBadge } from "./early-founder-badge";
 
 interface LeaderboardRowProps {
   row: DbRow | ExtendedLeaderboardRow;
@@ -62,11 +63,12 @@ export function LeaderboardRow({ row }: LeaderboardRowProps) {
                 </span>
               ) : null}
 
-              {extended.is_founding_50 ? (
-                <span className="hidden md:inline-flex items-center gap-1 rounded-full bg-surface-subtle border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
-                  <Sparkles className="h-2.5 w-2.5 text-accent" />
-                  Founding 50
-                </span>
+              {row.is_early_founder ? (
+                <EarlyFounderBadge
+                  number={row.founder_number}
+                  size="sm"
+                  className="hidden md:inline-flex"
+                />
               ) : null}
             </div>
 

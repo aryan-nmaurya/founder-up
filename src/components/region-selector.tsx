@@ -46,13 +46,15 @@ export function RegionSelector({
     };
   }, []);
 
-  // Auto-focus search input when opened
+  // Auto-focus search input when opened, and reset the query when it closes.
+  // Both happen in the timer callback so neither is a synchronous setState
+  // inside the effect body.
   useEffect(() => {
-    if (dropdownOpen) {
-      setTimeout(() => searchInputRef.current?.focus(), 50);
-    } else {
-      setSearchQuery("");
-    }
+    const id = setTimeout(() => {
+      if (dropdownOpen) searchInputRef.current?.focus();
+      else setSearchQuery("");
+    }, 50);
+    return () => clearTimeout(id);
   }, [dropdownOpen]);
 
   function updateQuery(next: Record<string, string | null>) {
