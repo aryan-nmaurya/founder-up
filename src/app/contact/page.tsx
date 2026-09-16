@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage, H2, P } from "@/components/legal-page";
-import { APP_NAME, CONTACT_EMAIL } from "@/lib/config";
+import { APP_NAME, CONTACT_EMAIL, LEGAL_OPERATOR_NAME } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -37,11 +37,10 @@ export default function ContactPage() {
         Reports are reviewed manually.
       </P>
 
-      <P className="text-subtle">
-        <em>
-          Registered business name and address should be added here before
-          launch — Razorpay requires them for account activation.
-        </em>
+      <H2>Operator</H2>
+      <P>
+        {LEGAL_OPERATOR_NAME} operates this service. Legal notices may be sent to
+        the email address above.
       </P>
     </LegalPage>
   );

@@ -1,0 +1,77 @@
+# Dedicated Supabase stack for the E2E suite.
+#
+# It runs beside the development stack on its own ports and volumes, so the
+# suite can reset it freely without ever touching local development data.
+# Migrations are the real ones: ./migrations links to ../../../supabase/migrations.
+project_id = "founder-up-e2e"
+
+[api]
+enabled = true
+port = 55321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 55322
+shadow_port = 55320
+major_version = 17
+
+[db.pooler]
+enabled = false
+port = 55329
+
+[db.seed]
+enabled = false
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+port = 55323
+
+# Magic-link emails land here; the onboarding spec reads them over its API.
+[local_smtp]
+enabled = true
+port = 55324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[storage.s3_protocol]
+enabled = false
+
+[storage.vector]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://localhost:3100"
+additional_redirect_urls = ["http://localhost:3100/auth/callback", "http://127.0.0.1:3100/auth/callback"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+minimum_password_length = 6
+
+# The suite signs in far more often than a person would.
+[auth.rate_limit]
+email_sent = 1000
+sign_in_sign_ups = 1000
+token_verifications = 1000
+token_refresh = 1000
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+max_frequency = "1s"
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false
+port = 55327

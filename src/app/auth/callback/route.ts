@@ -30,12 +30,8 @@ export async function GET(request: NextRequest) {
   // Send half-finished signups to onboarding, everyone else onward.
   const { data } = await supabase.auth.getUser();
   if (data.user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("auth_user_id", data.user.id)
-      .maybeSingle();
-    if (!profile) return NextResponse.redirect(`${origin}/onboarding`);
+    const { data: founderId } = await supabase.rpc("current_founder_id");
+    if (!founderId) return NextResponse.redirect(`${origin}/onboarding`);
   }
 
   const safeNext = next && next.startsWith("/") ? next : "/dashboard";

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 import { FounderAvatar } from "./founder-avatar";
+import { Search } from "lucide-react";
 
 export async function Header() {
   const profile = await getCurrentProfile();
@@ -47,30 +48,38 @@ export async function Header() {
         <nav className="flex items-center gap-1 text-[14px] font-medium sm:gap-2">
           <Link
             href="/#leaderboard"
-            className="rounded-lg px-3 py-1.5 text-muted hover:bg-surface hover:text-fg transition-colors"
+            className="hidden rounded-lg px-3 py-1.5 text-muted hover:bg-surface hover:text-fg transition-colors sm:inline-flex"
           >
             Leaderboard
           </Link>
 
           <Link
             href="/about"
-            className="rounded-lg px-3 py-1.5 text-muted hover:bg-surface hover:text-fg transition-colors"
+            className="hidden rounded-lg px-3 py-1.5 text-muted hover:bg-surface hover:text-fg transition-colors sm:inline-flex"
           >
             About
           </Link>
 
           <Link
             href="/rules"
-            className="rounded-lg px-3 py-1.5 text-muted hover:bg-surface hover:text-fg transition-colors"
+            className="hidden rounded-lg px-3 py-1.5 text-muted hover:bg-surface hover:text-fg transition-colors sm:inline-flex"
           >
             Rules
+          </Link>
+
+          <Link
+            href="/search"
+            aria-label="Search founders"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-surface hover:text-fg"
+          >
+            <Search className="h-4 w-4" />
           </Link>
 
           {profile ? (
             <div className="ml-1 flex items-center gap-2">
               <Link
                 href="/dashboard"
-                className="rounded-lg bg-surface border border-border px-3 py-1.5 text-fg hover:border-border-strong transition-colors"
+                className="hidden rounded-lg bg-surface border border-border px-3 py-1.5 text-fg hover:border-border-strong transition-colors sm:inline-flex"
               >
                 Dashboard
               </Link>

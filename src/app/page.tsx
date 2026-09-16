@@ -8,9 +8,13 @@ import { HowItWorks } from "@/components/how-it-works";
 import { HeroSection } from "@/components/hero-section";
 import { EarlyFounderSpots } from "@/components/early-founder-spots";
 import { TrackEvent } from "@/components/track-event";
+import { Notice } from "@/components/ui/misc";
 import {
+  getFounderRanks,
+  getCurrentLeader,
   getLeaderboard,
   getLeaderboardCount,
+  getNextRankGap,
   getRecentActivity,
   type Period,
 } from "@/lib/ranking";
@@ -46,10 +50,10 @@ export default async function HomePage({
   const requested = Number(params.limit);
   const limit = Math.min(
     Number.isFinite(requested) && requested > 0 ? requested : LEADERBOARD_PAGE_SIZE,
-    100,
+    5_000,
   );
 
-  const [rows, total, activity, activeCountries, profile, earlyFounders] =
+  const [leaderboardRows, leaderboardTotal, activity, activeCountries, profile, earlyFounders, leader] =
     await Promise.all([
       getLeaderboard({ period, country, limit }),
       getLeaderboardCount(period, country),
@@ -57,7 +61,15 @@ export default async function HomePage({
       getActiveCountries(),
       getCurrentProfile(),
       getEarlyFounderStatus(),
+      getCurrentLeader(period, country),
     ]);
+
+  const [heroRanks, heroGap] = profile
+    ? await Promise.all([getFounderRanks(profile.id), getNextRankGap(profile.id)])
+    : [null, null];
+  const leaderboardAvailable = leaderboardRows !== null && leaderboardTotal !== null;
+  const rows = leaderboardRows ?? [];
+  const total = leaderboardTotal ?? 0;
 
   const query = new URLSearchParams();
   if (period === "TODAY") query.set("period", "today");
@@ -72,7 +84,7 @@ export default async function HomePage({
       <TrackEvent event="homepage_view" />
 
       {/* Main Competitive Hero */}
-      <HeroSection profile={profile} />
+      <HeroSection profile={profile} ranks={heroRanks} gap={heroGap} />
 
       {/* Early Founder availability - counted in the database, not hardcoded. */}
       <EarlyFounderSpots status={earlyFounders} />
@@ -94,18 +106,37 @@ export default async function HomePage({
           {country ? ` for ${countryName(country)}` : " (global)"}
         </h2>
 
-        {/* Top 3 Spotlight */}
-        {podium.length > 0 && <TopThree rows={podium} />}
+        {!leaderboardAvailable ? (
+          <Notice tone="warning">
+            The leaderboard couldn&apos;t be loaded right now. Please check again shortly.
+          </Notice>
+        ) : (
+          <>
+            {podium.length > 0 ? (
+              <TopThree
+                rows={podium}
+                leadingSince={
+                  leader && leader.founder_id === podium[0].id ? leader.started_at : null
+                }
+              />
+            ) : null}
 
-        {/* Rest of Leaderboard */}
-        <Leaderboard
-          rows={rest.length > 0 ? rest : (podium.length > 0 ? [] : rows)}
-          country={country}
-          period={period}
-          total={total}
-          shown={rows.length}
-          baseQuery={query.toString()}
-        />
+            {rest.length > 0 || podium.length === 0 ? (
+              <Leaderboard
+                rows={rest.length > 0 ? rest : rows}
+                country={country}
+                period={period}
+                total={total}
+                shown={rows.length}
+                baseQuery={query.toString()}
+              />
+            ) : (
+              <p className="text-center text-[12px] font-medium text-subtle tabular">
+                Showing {rows.length} of {total} ranked founders
+              </p>
+            )}
+          </>
+        )}
       </section>
 
       {/* Live Activity Feed */}

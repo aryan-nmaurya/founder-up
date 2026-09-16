@@ -1,11 +1,12 @@
 import "server-only";
 import { createServerSupabase } from "./supabase/server";
 import { createPublicSupabase } from "./supabase/public";
+import { PUBLIC_PROFILE_COLUMNS } from "./profile-columns";
 import type {
   BoostOrder,
   FounderStats,
   Payment,
-  Profile,
+  PublicProfile,
   SearchRow,
   Venture,
 } from "@/types/db";
@@ -18,15 +19,16 @@ function reader() {
 
 export async function getProfileByUsername(
   username: string,
-): Promise<Profile | null> {
+): Promise<PublicProfile | null> {
   const supabase = reader();
   if (supabase) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
-      .select("*")
+      .select(PUBLIC_PROFILE_COLUMNS)
       .eq("username", username.toLowerCase())
       .maybeSingle();
-    return (data as Profile | null) ?? null;
+    if (error) console.error("[profile] lookup failed:", error.message);
+    return (data as PublicProfile | null) ?? null;
   }
   return null;
 }
@@ -58,18 +60,20 @@ export async function getOwnVentures(founderId: string): Promise<Venture[]> {
   return (data ?? []) as Venture[];
 }
 
-/** Plan §55 - what a founder gets for their money. */
-export async function getFounderStats(
-  founderId: string,
-): Promise<FounderStats> {
-  const supabase = reader();
-  const empty = { profile_views: 0, website_clicks: 0, connect_clicks: 0 };
-  if (!supabase) return empty;
-  const { data, error } = await supabase.rpc("founder_stats", {
-    p_founder_id: founderId,
-  });
-  if (error || !data?.length) return empty;
-  const row = data[0] as Record<string, number | string>;
+/**
+ * Plan §55 - what a founder gets for their money. Always the signed-in
+ * founder's own numbers: the database derives whose from the session. Null
+ * when they couldn't be read, so a failure never passes for zero reach.
+ */
+export async function getOwnFounderStats(): Promise<FounderStats | null> {
+  const supabase = await createServerSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc("my_founder_stats");
+  if (error) {
+    console.error("[stats] my_founder_stats failed:", error.message);
+    return null;
+  }
+  const row = (data?.[0] ?? {}) as Record<string, number | string>;
   return {
     profile_views: Number(row.profile_views ?? 0),
     website_clicks: Number(row.website_clicks ?? 0),

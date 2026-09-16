@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
-import { getFounderRanks, getNextRankGap } from "@/lib/ranking";
-import { getFounderStats, getPaymentHistory } from "@/lib/db";
+import { getFounderRanks, getLeadership, getNextRankGap } from "@/lib/ranking";
+import { getOwnFounderStats, getPaymentHistory } from "@/lib/db";
 import { resolveCurrency } from "@/lib/geo";
 import { getSessionUser } from "@/lib/auth";
 import { isRazorpayConfigured } from "@/lib/razorpay";
 import { BoostDialog } from "@/components/boost-dialog";
 import { FounderRank } from "@/components/founder-rank";
 import { EarlyFounderBadge } from "@/components/early-founder-badge";
+import { LeadingFor } from "@/components/leading-for";
 import { Divider, Notice, Stat } from "@/components/ui/misc";
 import { TrackEvent } from "@/components/track-event";
 import { ButtonLink } from "@/components/ui/button";
@@ -38,11 +39,12 @@ export default async function DashboardPage({
   const [ranks, gap, stats, payments, currency, user] = await Promise.all([
     getFounderRanks(profile.id),
     getNextRankGap(profile.id),
-    getFounderStats(profile.id),
+    getOwnFounderStats(),
     getPaymentHistory(profile.id),
     resolveCurrency(),
     getSessionUser(),
   ]);
+  const leadership = await getLeadership(profile.id, ranks, profile.country_code);
 
   return (
     <div className="mx-auto max-w-(--container-narrow) space-y-8">
@@ -57,7 +59,7 @@ export default async function DashboardPage({
           >
             /{profile.username}
           </Link>
-          . Boost to enter the leaderboard.
+          . {profile.is_ranked ? "You’re on the leaderboard." : "Boost to enter the leaderboard."}
         </Notice>
       ) : null}
 
@@ -80,6 +82,12 @@ export default async function DashboardPage({
             className="text-[19px]"
           />
         </div>
+
+        {leadership ? (
+          <p className="mt-1.5 text-[13px] font-semibold text-muted">
+            <LeadingFor since={leadership.since} label={leadership.label} />
+          </p>
+        ) : null}
 
         <p className="mt-2 text-[26px] font-semibold tabular">
           {formatPoints(profile.total_rank_points)}{" "}
@@ -122,11 +130,12 @@ export default async function DashboardPage({
 
         <div className="mt-5 flex flex-wrap gap-2">
           <BoostDialog
+            founderId={profile.id}
             ranks={ranks}
             gap={gap}
             defaultCurrency={currency.currency as Currency}
-            founderName={profile.full_name}
-            founderEmail={user?.email ?? ""}
+            payerName={profile.full_name}
+            payerEmail={user?.email ?? ""}
             username={profile.username}
             countryCode={profile.country_code}
             razorpayEnabled={isRazorpayConfigured()}
@@ -153,11 +162,17 @@ export default async function DashboardPage({
         <h2 className="text-[13px] font-medium uppercase tracking-wide text-subtle">
           Your reach
         </h2>
-        <div className="mt-3 grid grid-cols-3 gap-4">
-          <Stat label="Profile views" value={formatPoints(stats.profile_views)} />
-          <Stat label="Website clicks" value={formatPoints(stats.website_clicks)} />
-          <Stat label="Connect clicks" value={formatPoints(stats.connect_clicks)} />
-        </div>
+        {stats ? (
+          <div className="mt-3 grid grid-cols-3 gap-4">
+            <Stat label="Profile views" value={formatPoints(stats.profile_views)} />
+            <Stat label="Website clicks" value={formatPoints(stats.website_clicks)} />
+            <Stat label="Connect clicks" value={formatPoints(stats.connect_clicks)} />
+          </div>
+        ) : (
+          <p className="mt-3 text-[14px] text-muted">
+            Your reach numbers couldn&apos;t be loaded right now.
+          </p>
+        )}
       </section>
 
       <Divider />

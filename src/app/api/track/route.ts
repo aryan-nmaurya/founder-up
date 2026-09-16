@@ -41,7 +41,10 @@ export async function POST(request: Request) {
 
   try {
     if (parsed.data.event === "PROFILE_VIEW") {
-      const hash = await visitorHash(parsed.data.founder_id);
+      // Rotate the de-duplication key every UTC day. The stored digest cannot
+      // follow a visitor across days and no raw connection data is retained.
+      const day = new Date().toISOString().slice(0, 10);
+      const hash = await visitorHash(`${parsed.data.founder_id}:${day}`);
       await recordProfileView(parsed.data.founder_id, hash);
     } else if (parsed.data.link_type) {
       await recordClick(

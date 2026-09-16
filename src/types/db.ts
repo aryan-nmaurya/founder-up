@@ -69,6 +69,15 @@ export type Profile = {
   updated_at: string;
 };
 
+/**
+ * What any visitor may read about a founder. The rest of Profile is private
+ * and only reachable by its owner, through current_profile(). Migration 0007.
+ */
+export type PublicProfile = Omit<
+  Profile,
+  "auth_user_id" | "is_admin" | "country_changed_at" | "profile_completed_at"
+>;
+
 export type Venture = {
   id: string;
   founder_id: string;
@@ -132,6 +141,12 @@ export type NextRankGap = {
   global_target_rank: number | null;
   country_gap: number | null;
   country_target_rank: number | null;
+};
+
+/** The sitting #1 of one leaderboard view, and when they took it (migration 0009). */
+export type CurrentLeader = {
+  founder_id: string;
+  started_at: string;
 };
 
 export type FounderStats = {
@@ -226,3 +241,21 @@ export type AwardResult = {
   new_country_rank: number | null;
   country_code?: string;
 };
+
+/** What a confirmed boost did. A rank is null when it can't be known. */
+export type BoostOutcome = {
+  rank_points: number;
+  previous_global_rank: number | null;
+  new_global_rank: number | null;
+  previous_country_rank: number | null;
+  new_country_rank: number | null;
+};
+
+/**
+ * /api/boost/verify. Only CONFIRMED may be shown as success; every other
+ * answer means money may have moved, so the payment form must not come back.
+ */
+export type VerifyResponse =
+  | { status: "CONFIRMED"; outcome: BoostOutcome }
+  | { status: "PENDING"; message: string }
+  | { error: string };

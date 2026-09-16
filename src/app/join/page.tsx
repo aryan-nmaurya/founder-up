@@ -14,9 +14,9 @@ export const metadata: Metadata = {
 export default async function JoinPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
 
   const user = await getSessionUser();
   if (user) {
@@ -36,6 +36,14 @@ export default async function JoinPage({
       </div>
 
       <div className="mt-7">
+        {error ? (
+          <p
+            role="alert"
+            className="mb-4 rounded-xl border border-negative/25 bg-negative/5 px-3.5 py-2.5 text-[13px] font-medium text-negative"
+          >
+            Sign-in didn&apos;t complete. Please try again.
+          </p>
+        ) : null}
         <AuthButtons next={next} />
       </div>
 

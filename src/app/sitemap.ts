@@ -2,6 +2,10 @@ import type { MetadataRoute } from "next";
 import { APP_URL } from "@/lib/config";
 import { getAllUsernames } from "@/lib/db";
 
+// Metadata routes are cached by default in Next.js 16. Founder profiles change
+// continuously, so generate this route from current data on every request.
+export const dynamic = "force-dynamic";
+
 /** Plan §40 - founder profiles are the strongest organic surface. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes = [

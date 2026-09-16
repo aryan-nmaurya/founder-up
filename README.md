@@ -43,13 +43,18 @@ Apply the schema. With the Supabase CLI:
 npx supabase db reset
 ```
 
-Or paste `supabase/migrations/*.sql` into the SQL editor **in order** (0001 → 0005).
+Or paste `supabase/migrations/*.sql` into the SQL editor **in order** (0001 → 0009).
 
 ### 2. Environment
 
 Fill in `.env.local`. The Supabase URL and anon key are public by design; the
 service role key and both Razorpay secrets are server-only and must never be
 prefixed with `NEXT_PUBLIC_`.
+
+Set `NEXT_PUBLIC_LEGAL_OPERATOR_NAME` to the person or entity operating the
+service and `NEXT_PUBLIC_LEGAL_JURISDICTION` to the governing jurisdiction used
+in the Terms. The example defaults are `FounderUp` and `India`; replace them if
+the actual operator differs before deployment.
 
 ### 3. Auth providers
 
@@ -86,6 +91,11 @@ UTC day, identical for every visitor, so a new founder always has a board they
 can realistically win.
 
 Ties break on **who reached the score first**.
+
+Each board's #1 shows how long they have held it ("Leading for 3d 4h"). The
+database opens a reign whenever #1 really changes hands - a boost past them, a
+refund, a suspension, a country change - so a leader who boosts again keeps
+their clock (`leader_reigns`, migration 0009).
 
 Founders with zero points are not on the leaderboard; they show as *Unranked*
 and appear in search.
@@ -181,6 +191,14 @@ Safety properties, all covered by the SQL test suite:
 - **Reversible.** A bank-forced refund or chargeback writes a negative ledger
   entry, decrements the all-time and daily scores, and keeps the original
   payment row.
+- **Never ambiguous.** Once Checkout has taken the money, `/api/boost/verify`
+  answers `CONFIRMED` with the real outcome (including when the webhook got
+  there first), `PENDING`, or an error - and the boost dialog never shows the
+  payment form again for that payment. Nothing is simulated when Razorpay isn't
+  configured; checkout is simply unavailable.
+- **Your own account only.** A boost always credits the signed-in founder. The
+  dialog also sends the profile it is showing, and the order API refuses any
+  mismatch rather than charging one founder for another's boost.
 
 ### Refunds
 
@@ -198,12 +216,25 @@ the policy says. When the money goes, the points go with it.
 - **Column grants.** `total_rank_points`, payment status, the ledger and admin
   flags are not in the `authenticated` update grant, so RLS can't be talked
   into letting a founder write their own score.
+- **Private columns stay private.** Reads of `profiles` are granted column by
+  column (`src/lib/profile-columns.ts` mirrors the list). `auth_user_id`,
+  `is_admin` and the country-change metadata are withheld from everyone; a
+  founder reads their own row through `current_profile()`. Reach statistics
+  (`my_founder_stats()`) only ever return the caller's own numbers.
 - **Service role isolation.** Points, tracking and admin operations run through
   `SECURITY DEFINER` functions granted only to `service_role`.
 - **Username and country** changes go through guarded functions — reserved-name
   blocking, uniqueness, and a 30-day country cooldown (plan §30), all audited.
+  The cooldown lives inside `change_country`, not in a parameter the caller
+  controls, and countries are a foreign key to a `countries` table that
+  mirrors the picker.
 - **URLs** are validated to http/https only; `javascript:` and `data:` are
-  rejected. External links carry `rel="noopener noreferrer"`.
+  rejected - by the app, and again by `CHECK` constraints, so a write straight
+  through the Supabase API can't store one either. External links carry
+  `rel="noopener noreferrer"`.
+- **Founder numbers can't be burned.** `create_founder_profile` validates every
+  input before drawing a number, so a rejected call never consumes an Early
+  Founder spot.
 - **User text** is stored and rendered as plain text. No HTML is ever rendered
   from user input.
 - **Rate limits** on signup, username checks, profile writes, search, boost
@@ -264,22 +295,65 @@ supabase/migrations/          schema, functions, RLS, storage
 
 ## Testing
 
-`npm run build` type-checks the whole app.
+`npm run typecheck` and `npm run lint` cover the code; `npm run build` does both.
 
-The ranking and payment logic has a SQL suite covering the cases that actually
-matter — duplicate webhooks, unknown orders, tie-breaks, USD conversion,
-rounding, forced refunds, double refunds, daily reset, venture caps, country
-cooldown and reserved usernames. Run it against a scratch Postgres:
+### Database suites
+
+The logic that moves money or rank, and the access rules around it, are checked
+against a real Postgres rather than mocked:
+
+| Suite | Covers |
+| --- | --- |
+| `ranking_test.sql` | pricing, USD conversion, idempotent webhooks, tie-breaks, refunds, the daily board |
+| `early_founder_test.sql` | founder numbers, the 50-spot cut-off, immutability |
+| `security_test.sql` | what `anon` and a signed-in founder can read and write: private columns, reach stats, URL and country validation |
+| `leader_test.sql` | when #1 changes hands, and the lead clock that goes with it |
+| `concurrency_test.sh` | simultaneous onboarding over real parallel connections |
 
 ```bash
 psql "$DATABASE_URL" -v allow_destructive=1 -f supabase/tests/ranking_test.sql
 psql "$DATABASE_URL" -v allow_destructive=1 -f supabase/tests/early_founder_test.sql
-ALLOW_DESTRUCTIVE=1 bash supabase/tests/concurrency_test.sh
+psql "$DATABASE_URL" -v allow_destructive=1 -f supabase/tests/security_test.sql
+psql "$DATABASE_URL" -v allow_destructive=1 -f supabase/tests/leader_test.sql
+ALLOW_DESTRUCTIVE=1 PGURL="$DATABASE_URL" bash supabase/tests/concurrency_test.sh
 ```
 
 Every suite truncates all founders, so each refuses to run without that explicit
 opt-in. Point them at a local or throwaway database only — never at a database
-with real founders.
+with real founders. `supabase/tests/README.md` has a scratch-Postgres recipe.
+
+### End-to-end
+
+```bash
+npx playwright install chromium   # once
+npm run test:e2e
+```
+
+Playwright drives a production build in a real browser against real Supabase
+services. It needs Docker and the Supabase CLI, and it never touches your
+development data:
+
+- `e2e/stack.mjs` starts a **dedicated** Supabase stack from
+  `e2e/stack/supabase/config.toml` - its own ports (553xx) and volumes, the
+  same migrations - and the suite empties it before every run.
+- The app is built once and served twice: on `:3100` with a stand-in Razorpay
+  (`e2e/support/razorpay-mock.mjs`), and on `:3101` with no payment keys.
+  `RAZORPAY_API_BASE_URL` only takes effect with `rzp_test_` keys, so a live
+  deployment can never be pointed at anything but Razorpay.
+- Onboarding signs in with the real magic-link email (read from the stack's
+  Mailpit); other specs use real `@supabase/ssr` session cookies.
+
+Covered: magic-link sign-in → onboarding → Early Founder → first venture;
+boosting your own profile, including the webhook-first race, a still-processing
+payment, an unconfirmed payment and an abandoned checkout; refusing a boost
+aimed at another founder; a deployment without Razorpay; the #1's lead time on
+the podium, the Today board, their profile and dashboard; private columns, reach
+stats and URL/country validation attacked straight through the Supabase API;
+profile editing; and contracts that keep the SQL and TypeScript country and
+column lists in step.
+
+`PW_CHANNEL=chrome` runs against an installed Chrome instead of the bundled
+Chromium; `E2E_SKIP_BUILD=1` reuses the last build while iterating on specs.
 
 ## What is deliberately not built
 

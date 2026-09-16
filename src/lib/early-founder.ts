@@ -5,6 +5,7 @@ import { EARLY_FOUNDER_LIMIT } from "./config";
 import { LEADERBOARD_TAG } from "./ranking";
 
 export type EarlyFounderStatus = {
+  available: boolean;
   claimed: number;
   spots: number;
   remaining: number;
@@ -12,6 +13,7 @@ export type EarlyFounderStatus = {
 };
 
 const FALLBACK: EarlyFounderStatus = {
+  available: false,
   claimed: 0,
   spots: EARLY_FOUNDER_LIMIT,
   remaining: EARLY_FOUNDER_LIMIT,
@@ -45,6 +47,7 @@ export async function getEarlyFounderStatus(): Promise<EarlyFounderStatus> {
         all_claimed: boolean;
       };
       return {
+        available: true,
         claimed: Number(row.claimed),
         spots: Number(row.spots),
         remaining: Number(row.remaining),

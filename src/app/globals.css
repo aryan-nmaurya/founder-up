@@ -12,11 +12,11 @@
   --color-surface-subtle: #F7F5F0;
   --color-fg: #171717;
   --color-muted: #737373;
-  --color-subtle: #949089;
+  --color-subtle: #6F6B65;
   --color-border: #EAE7E2;
   --color-border-strong: #D8D4CC;
-  --color-accent: #F26A4F;
-  --color-accent-hover: #E2573C;
+  --color-accent: #C44732;
+  --color-accent-hover: #A93C28;
   --color-accent-subtle: #FDF3F0;
   --color-positive: #0F8B4C;
   --color-negative: #D93829;
@@ -28,6 +28,30 @@
   /* Spec: Centered content area around 1100–1180px */
   --container-page: 1140px;
   --container-narrow: 840px;
+}
+
+.fu-dialog {
+  inset: auto 0 0;
+  width: min(100%, 32rem);
+  max-height: calc(100dvh - 1rem);
+  margin: 0 auto;
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.fu-dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+  backdrop-filter: blur(2px);
+}
+
+@media (min-width: 640px) {
+  .fu-dialog {
+    inset: 0;
+    margin: auto;
+  }
 }
 
 :root {

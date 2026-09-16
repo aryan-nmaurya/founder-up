@@ -5,12 +5,15 @@ import { FounderAvatar } from "./founder-avatar";
 import { Clock, Flame } from "lucide-react";
 import type { LeaderboardRow as DbRow } from "@/types/db";
 import { EarlyFounderBadge } from "./early-founder-badge";
+import { LeadingFor } from "./leading-for";
 
 interface TopThreeProps {
   rows: DbRow[];
+  /** When the #1 took the top spot on this board. */
+  leadingSince?: string | null;
 }
 
-export function TopThree({ rows }: TopThreeProps) {
+export function TopThree({ rows, leadingSince }: TopThreeProps) {
   if (!rows || rows.length === 0) return null;
 
   const first = rows[0];
@@ -38,7 +41,7 @@ export function TopThree({ rows }: TopThreeProps) {
               <span className="text-[22px] sm:text-[26px] font-black text-accent tabular tracking-tight">
                 #1
               </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-accent/80">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
                 Top
               </span>
             </div>
@@ -121,11 +124,9 @@ export function TopThree({ rows }: TopThreeProps) {
               {formatPoints(first.points)}
               <span className="ml-1 text-[13px] font-bold text-accent">RP</span>
             </div>
-            {false ? null : (
-              <div className="text-[12px] font-semibold text-muted">
-                Current Leader
-              </div>
-            )}
+            <div className="mt-0.5 text-[12px] font-semibold text-muted">
+              {leadingSince ? <LeadingFor since={leadingSince} /> : "Current Leader"}
+            </div>
           </div>
         </div>
       </Link>

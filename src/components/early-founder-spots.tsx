@@ -12,6 +12,14 @@ export function EarlyFounderSpots({ status }: { status: EarlyFounderStatus }) {
   const minInr = formatMoney(MIN_AMOUNT_SUBUNIT.INR, "INR");
   const minUsd = formatMoney(MIN_AMOUNT_SUBUNIT.USD, "USD");
 
+  if (!status.available) {
+    return (
+      <div className="rounded-xl border border-border bg-white px-4 py-3 text-[13px] text-muted shadow-2xs sm:px-5">
+        Early Founder availability couldn&apos;t be loaded right now. Please check again shortly.
+      </div>
+    );
+  }
+
   if (status.allClaimed) {
     return (
       <div className="rounded-xl border border-border bg-white px-4 py-3 sm:px-5 sm:py-3.5 shadow-2xs">

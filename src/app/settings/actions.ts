@@ -61,54 +61,34 @@ export async function updateProfileAction(
     };
   }
 
-  // Username and country go through their own guarded functions.
-  if (data.username !== profile.username) {
-    const { error } = await supabase.rpc("change_username", {
-      p_username: data.username,
-    });
-    if (error) {
-      if (error.message.includes("USERNAME_TAKEN")) return { error: "That username is taken." };
-      if (error.message.includes("USERNAME_RESERVED")) return { error: "That username is reserved." };
-      return { error: "Could not change your username." };
-    }
-  }
-
-  if (data.country_code !== profile.country_code) {
-    const { error } = await supabase.rpc("change_country", {
-      p_country_code: data.country_code,
-      p_cooldown_days: COUNTRY_CHANGE_COOLDOWN_DAYS,
-    });
-    if (error) {
-      if (error.message.includes("COUNTRY_COOLDOWN")) {
-        return {
-          error: `You can only change your country once every ${COUNTRY_CHANGE_COOLDOWN_DAYS} days.`,
-        };
-      }
-      return { error: "Could not change your country." };
-    }
-  }
-
   const avatarUrl = formData.get("avatar_url");
 
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      full_name: data.full_name,
-      headline: plainText(data.headline ?? "", LIMITS.headline),
-      bio: plainText(data.bio ?? "", LIMITS.bio),
-      website_url: data.website_url,
-      x_url: data.x_url,
-      linkedin_url: data.linkedin_url,
-      github_url: data.github_url,
-      contact_type: data.contact_type,
-      contact_value: data.contact_type === "EMAIL" ? data.contact_email : null,
-      ...(typeof avatarUrl === "string" && avatarUrl
-        ? { avatar_url: safeExternalUrl(avatarUrl) }
-        : {}),
-    })
-    .eq("id", profile.id);
+  const { error } = await supabase.rpc("update_founder_profile", {
+    p_username: data.username,
+    p_country_code: data.country_code,
+    p_full_name: data.full_name,
+    p_avatar_url:
+      typeof avatarUrl === "string" && avatarUrl ? safeExternalUrl(avatarUrl) : null,
+    p_headline: plainText(data.headline ?? "", LIMITS.headline) || null,
+    p_bio: plainText(data.bio ?? "", LIMITS.bio) || null,
+    p_website_url: data.website_url,
+    p_x_url: data.x_url,
+    p_linkedin_url: data.linkedin_url,
+    p_github_url: data.github_url,
+    p_contact_type: data.contact_type,
+    p_contact_value: data.contact_type === "EMAIL" ? data.contact_email : null,
+  });
 
   if (error) {
+    if (error.message.includes("USERNAME_TAKEN")) return { error: "That username is taken." };
+    if (error.message.includes("USERNAME_RESERVED")) return { error: "That username is reserved." };
+    if (error.message.includes("USERNAME_INVALID")) return { error: "That username is invalid." };
+    if (error.message.includes("COUNTRY_INVALID")) return { error: "Choose a country." };
+    if (error.message.includes("COUNTRY_COOLDOWN")) {
+      return {
+        error: `You can only change your country once every ${COUNTRY_CHANGE_COOLDOWN_DAYS} days.`,
+      };
+    }
     console.error("[settings] profile update failed:", error.message);
     return { error: "Could not save your profile." };
   }
@@ -234,15 +214,13 @@ export async function reorderVentureAction(
 
   [list[index], list[target]] = [list[target], list[index]];
 
-  await Promise.all(
-    list.map((venture, position) =>
-      supabase
-        .from("ventures")
-        .update({ sort_order: position })
-        .eq("id", venture.id)
-        .eq("founder_id", profile.id),
-    ),
-  );
+  const { error } = await supabase.rpc("reorder_founder_ventures", {
+    p_ordered_ids: list.map((venture) => venture.id),
+  });
+  if (error) {
+    console.error("[settings] venture reorder failed:", error.message);
+    return { error: "Could not reorder your ventures." };
+  }
 
   revalidatePath("/settings/ventures");
   revalidatePath(`/${profile.username}`);

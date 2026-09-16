@@ -18,6 +18,11 @@
 truncate auth.users cascade;
 truncate public.activity_events, public.webhook_events, public.audit_logs;
 
+-- These cases are about points-based ranking, so the founders are numbered
+-- from #51: past the Early Founder spots, they start Unranked like anyone who
+-- joins after launch. early_founder_test.sql covers #1-#50.
+select setval('public.founder_number_seq', 50, true);
+
 -- helper: create an auth user + profile the way onboarding does
 create or replace function test_founder(p_username text, p_name text, p_country text)
 returns uuid language plpgsql as $$
@@ -26,7 +31,9 @@ begin
   -- id is supplied explicitly: real Supabase's auth.users has no default on it.
   insert into auth.users (id, email) values (v_uid, p_username || '@test.local');
   perform set_config('request.jwt.claim.sub', v_uid::text, true);
-  select public.create_founder_profile(p_username, p_name, p_country, 'Building things') into v_id;
+  -- create_founder_profile has returned a jsonb summary since migration 0006.
+  select (public.create_founder_profile(p_username, p_name, p_country, 'Building things') ->> 'id')::uuid
+    into v_id;
   return v_id;
 end $$;
 

@@ -47,6 +47,8 @@ export const FUNNEL_EVENTS = [
   "boost_amount_selected",
   "checkout_started",
   "payment_success",
+  "payment_pending",
+  "payment_unconfirmed",
   "payment_failed",
   "share_rank_clicked",
 ] as const;

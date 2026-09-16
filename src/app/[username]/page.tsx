@@ -13,13 +13,16 @@ import { TrackEvent } from "@/components/track-event";
 import { ButtonLink } from "@/components/ui/button";
 import { BoostDialog } from "@/components/boost-dialog";
 import { getProfileByUsername, getVentures } from "@/lib/db";
-import { getFounderRanks, getNextRankGap } from "@/lib/ranking";
-import { getCurrentProfile } from "@/lib/auth";
+import { getFounderRanks, getLeadership, getNextRankGap } from "@/lib/ranking";
+import { getCurrentProfile, getSessionUser } from "@/lib/auth";
+import { isRazorpayConfigured } from "@/lib/razorpay";
 import { countryName, flagFor } from "@/lib/countries";
 import { formatPoints, displayUrl } from "@/lib/format";
 import { APP_NAME, APP_URL } from "@/lib/config";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { EarlyFounderBadge } from "@/components/early-founder-badge";
+import { LeadingFor } from "@/components/leading-for";
+import type { PublicProfile } from "@/types/db";
 
 type Params = Promise<{ username: string }>;
 
@@ -67,7 +70,7 @@ export default async function FounderProfilePage({ params }: { params: Params })
     getCurrentProfile(),
   ]);
 
-  const profile =
+  const profile: PublicProfile | null =
     publicProfile ??
     (viewer?.username === username.toLowerCase() ? viewer : null);
   if (!profile) notFound();
@@ -75,11 +78,13 @@ export default async function FounderProfilePage({ params }: { params: Params })
   const isOwner = viewer?.id === profile.id;
   if (profile.is_suspended && !isOwner) notFound();
 
-  const [ventures, ranks, gap] = await Promise.all([
+  const [ventures, ranks, gap, sessionUser] = await Promise.all([
     getVentures(profile.id),
     getFounderRanks(profile.id),
-    getNextRankGap(profile.id),
+    isOwner ? getNextRankGap(profile.id) : null,
+    isOwner ? getSessionUser() : null,
   ]);
+  const leadership = await getLeadership(profile.id, ranks, profile.country_code);
 
   const projects = ventures.filter((v) => v.type === "PROJECT" && v.status === "ACTIVE");
   const businesses = ventures.filter((v) => v.type === "BUSINESS" && v.status === "ACTIVE");
@@ -187,6 +192,13 @@ export default async function FounderProfilePage({ params }: { params: Params })
                 {formatPoints(profile.total_rank_points)}{" "}
                 <span className="text-[11px] font-semibold text-accent">RP</span>
               </span>
+              {leadership ? (
+                <LeadingFor
+                  since={leadership.since}
+                  label={leadership.label}
+                  className="mt-1 text-[12px] font-semibold text-muted"
+                />
+              ) : null}
             </div>
           </div>
         </div>
@@ -274,13 +286,14 @@ export default async function FounderProfilePage({ params }: { params: Params })
             {isOwner ? (
               <div className="flex items-center gap-2">
                 <BoostDialog
+                  founderId={profile.id}
                   ranks={ranks}
                   gap={gap}
-                  founderName={profile.full_name}
-                  founderEmail="founder@example.com"
+                  payerName={profile.full_name}
+                  payerEmail={sessionUser?.email ?? ""}
                   username={profile.username}
                   countryCode={profile.country_code}
-                  razorpayEnabled={Boolean(process.env.RAZORPAY_KEY_ID)}
+                  razorpayEnabled={isRazorpayConfigured()}
                   triggerLabel="Boost your rank ↑"
                 />
                 <ButtonLink href="/settings/profile" variant="secondary" size="md">
@@ -288,16 +301,11 @@ export default async function FounderProfilePage({ params }: { params: Params })
                 </ButtonLink>
               </div>
             ) : (
-              <BoostDialog
-                ranks={ranks}
-                gap={gap}
-                founderName={profile.full_name}
-                founderEmail="founder@example.com"
-                username={profile.username}
-                countryCode={profile.country_code}
-                razorpayEnabled={Boolean(process.env.RAZORPAY_KEY_ID)}
-                triggerLabel="Boost this founder ↑"
-              />
+              // Rank Points always go to the account that pays, so a visitor
+              // is pointed at their own profile, never offered this one's.
+              <ButtonLink href={viewer ? "/dashboard" : "/join"} variant="secondary" size="md">
+                {viewer ? "Boost your own rank" : "Get your own profile"}
+              </ButtonLink>
             )}
           </div>
         </div>

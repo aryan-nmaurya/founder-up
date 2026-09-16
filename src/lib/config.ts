@@ -86,6 +86,11 @@ export const IMAGE_ACCEPTED_TYPES = [
 export const CONTACT_EMAIL =
   process.env.NEXT_PUBLIC_CONTACT_EMAIL || "hello@founderup.com";
 
+export const LEGAL_OPERATOR_NAME =
+  process.env.NEXT_PUBLIC_LEGAL_OPERATOR_NAME || APP_NAME;
+export const LEGAL_JURISDICTION =
+  process.env.NEXT_PUBLIC_LEGAL_JURISDICTION || "India";
+
 /** Plan §37 — shown next to every leaderboard. */
 export const RANKING_DISCLOSURE =
   "Rank is determined by paid Rank Points. Paying for Rank Points increases visibility; ranking does not represent FounderUp's endorsement or an objective measure of founder quality.";

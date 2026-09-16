@@ -14,6 +14,8 @@ import { clientKey, rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
  *
  * The founder id comes from the session, never from the request body, and the
  * amount is re-validated against the currency minimum before Razorpay sees it.
+ * The body does name the profile the dialog thinks it is boosting, but only so
+ * a mismatch can be refused.
  */
 export async function POST(request: Request) {
   const profile = await getCurrentProfile();
@@ -63,7 +65,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
   }
 
-  const { amount_subunit, currency } = parsed.data;
+  const { amount_subunit, currency, founder_id } = parsed.data;
+
+  // Rank Points always go to the signed-in founder. If the dialog was showing
+  // anyone else's profile, refuse rather than charge one account for a boost
+  // meant for another.
+  if (founder_id !== profile.id) {
+    return NextResponse.json(
+      { error: "You can only boost your own profile." },
+      { status: 403 },
+    );
+  }
+
   const supabase = requireAdminSupabase();
 
   // Step 3 - our own order first, so an abandoned checkout is still visible.
@@ -91,10 +104,15 @@ export async function POST(request: Request) {
       boostOrderId: order.id,
     });
 
-    await supabase
+    const { error: linkError } = await supabase
       .from("boost_orders")
       .update({ razorpay_order_id: razorpayOrder.id })
       .eq("id", order.id);
+    // Unlinked, neither the callback nor the webhook could find this order, so
+    // a payment would capture and award nothing. Never hand it to Checkout.
+    if (linkError) {
+      throw new Error(`could not link the Razorpay order: ${linkError.message}`);
+    }
 
     return NextResponse.json({
       boost_order_id: order.id,

@@ -29,7 +29,9 @@ export function ShareRank({
   const line =
     countryRank != null
       ? `Just reached ${formatRank(countryRank)} on FounderUp ${flagFor(countryCode)}`
-      : `Just reached ${formatRank(globalRank)} on FounderUp 🌍`;
+      : globalRank != null
+        ? `Just reached ${formatRank(globalRank)} on FounderUp 🌍`
+        : "My founder profile is live on FounderUp";
 
   const text = ventureName ? `${line}\nBuilding ${ventureName}.` : line;
 

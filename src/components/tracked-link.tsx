@@ -15,6 +15,7 @@ export function TrackedLink({
   founderId,
   linkType,
   ventureId,
+  newTab = true,
   className,
   children,
 }: {
@@ -22,6 +23,7 @@ export function TrackedLink({
   founderId: string;
   linkType: LinkType;
   ventureId?: string;
+  newTab?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -47,8 +49,8 @@ export function TrackedLink({
   return (
     <a
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+      target={newTab ? "_blank" : undefined}
+      rel={newTab ? "noopener noreferrer" : undefined}
       onClick={onClick}
       className={className}
     >

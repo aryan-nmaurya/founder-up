@@ -21,6 +21,8 @@ export type FunnelEvent =
   | "boost_amount_selected"
   | "checkout_started"
   | "payment_success"
+  | "payment_pending"
+  | "payment_unconfirmed"
   | "payment_failed"
   | "share_rank_clicked";
 
@@ -53,7 +55,9 @@ async function client(): Promise<PostHog | null> {
         // Plan §51 privacy posture: no session recording, no autocapture.
         autocapture: false,
         disable_session_recording: true,
-        persistence: "localStorage",
+        // Funnel events are intentionally session-scoped; do not assign a
+        // durable browser identity that could become a visitor profile.
+        persistence: "memory",
       });
       window.posthog = posthog;
       return posthog;

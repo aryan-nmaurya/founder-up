@@ -52,6 +52,9 @@ export async function createProfileAction(
     if (message.includes("USERNAME_INVALID")) {
       return { error: "Usernames use lowercase letters, numbers and underscores." };
     }
+    if (message.includes("COUNTRY_INVALID")) return { error: "Choose a country." };
+    if (message.includes("NAME_INVALID")) return { error: "Enter your name." };
+    if (message.includes("HEADLINE_INVALID")) return { error: "That headline is too long." };
     console.error("[onboarding] create_founder_profile failed:", message);
     return { error: "Could not create your profile. Please try again." };
   }
@@ -93,15 +96,11 @@ export async function addFirstVentureAction(
   const supabase = await createServerSupabase();
   if (!supabase) return { error: "Database is not configured." };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
-  if (!profile) redirect("/onboarding");
+  const { data: founderId } = await supabase.rpc("current_founder_id");
+  if (!founderId) redirect("/onboarding");
 
   const { error } = await supabase.from("ventures").insert({
-    founder_id: (profile as { id: string }).id,
+    founder_id: founderId as string,
     type: parsed.data.type,
     name: parsed.data.name,
     description: plainText(parsed.data.description ?? "", LIMITS.ventureDescription),

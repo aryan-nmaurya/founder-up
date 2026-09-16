@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage, H2, P, UL } from "@/components/legal-page";
-import { APP_NAME, CONTACT_EMAIL } from "@/lib/config";
+import {
+  APP_NAME,
+  CONTACT_EMAIL,
+  LEGAL_JURISDICTION,
+  LEGAL_OPERATOR_NAME,
+} from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Terms of service",
@@ -116,14 +121,17 @@ export default function TermsPage() {
       </P>
 
       <H2>Contact</H2>
-      <P>{CONTACT_EMAIL}</P>
+      <P>
+        These terms are between you and {LEGAL_OPERATOR_NAME}. Questions and legal
+        notices may be sent to {CONTACT_EMAIL}.
+      </P>
 
-      <P className="text-subtle">
-        <em>
-          Operator details and governing law should be completed before launch and
-          the commercial and tax language reviewed by a qualified professional in
-          your jurisdiction.
-        </em>
+      <H2>Governing law</H2>
+      <P>
+        These terms are governed by the laws of {LEGAL_JURISDICTION}, without
+        regard to conflict-of-law principles. Courts with jurisdiction there may
+        hear disputes, subject to any mandatory consumer protections that apply
+        where you live.
       </P>
     </LegalPage>
   );

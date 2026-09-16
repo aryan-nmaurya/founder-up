@@ -1,9 +1,11 @@
 import "server-only";
-import { unstable_cache, updateTag } from "next/cache";
+import { revalidateTag, unstable_cache, updateTag } from "next/cache";
 import { createPublicSupabase } from "./supabase/public";
 import { LEADERBOARD_CACHE_SECONDS, LEADERBOARD_PAGE_SIZE } from "./config";
+import { countryName } from "./countries";
 import type {
   ActivityEvent,
+  CurrentLeader,
   FounderRanks,
   LeaderboardRow,
   NextRankGap,
@@ -27,26 +29,35 @@ async function fetchLeaderboard(
   country: string | null,
   limit: number,
   offset: number,
-): Promise<LeaderboardRow[]> {
+): Promise<LeaderboardRow[] | null> {
   const supabase = reader();
-  if (supabase) {
-    const fn = period === "TODAY" ? "leaderboard_today" : "leaderboard_all_time";
+  if (!supabase) return null;
+
+  const fn = period === "TODAY" ? "leaderboard_today" : "leaderboard_all_time";
+  const rows: LeaderboardRow[] = [];
+  let remaining = limit;
+  let cursor = offset;
+
+  // The RPC deliberately caps one response at 100. Fetch larger requested
+  // result sets in bounded pages so "Load more" never stalls at that boundary.
+  while (remaining > 0) {
+    const pageSize = Math.min(remaining, 100);
     const { data, error } = await supabase.rpc(fn, {
       p_country: country,
-      p_limit: limit,
-      p_offset: offset,
+      p_limit: pageSize,
+      p_offset: cursor,
     });
-
     if (error) {
       console.error(`[leaderboard] ${fn} failed:`, error.message);
-    } else {
-      // A real answer wins, including an empty one. An empty leaderboard is a
-      // legitimate state and must never be papered over with fixtures.
-      return (data ?? []) as LeaderboardRow[];
+      return null;
     }
+    const page = (data ?? []) as LeaderboardRow[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    cursor += page.length;
+    remaining -= page.length;
   }
-
-  return [];
+  return rows;
 }
 
 /**
@@ -58,7 +69,7 @@ export async function getLeaderboard(opts: {
   country?: string | null;
   limit?: number;
   offset?: number;
-}): Promise<LeaderboardRow[]> {
+}): Promise<LeaderboardRow[] | null> {
   const period = opts.period ?? "ALL_TIME";
   const country = opts.country ?? null;
   const limit = opts.limit ?? LEADERBOARD_PAGE_SIZE;
@@ -75,7 +86,7 @@ export async function getLeaderboard(opts: {
 export async function getLeaderboardCount(
   period: Period,
   country: string | null,
-): Promise<number> {
+): Promise<number | null> {
   const supabase = reader();
   if (supabase) {
     const { data, error } = await supabase.rpc("leaderboard_count", {
@@ -85,7 +96,7 @@ export async function getLeaderboardCount(
     if (error) console.error("[leaderboard] count failed:", error.message);
     else if (data != null) return Number(data);
   }
-  return 0;
+  return null;
 }
 
 export async function getFounderRanks(
@@ -110,13 +121,61 @@ export async function getNextRankGap(
     const { data, error } = await supabase.rpc("next_rank_gap", {
       p_founder_id: founderId,
     });
-    if (!error && data?.length) return data[0] as NextRankGap;
+    if (error) console.error("[ranking] next_rank_gap failed:", error.message);
+    else if (data?.length) return data[0] as NextRankGap;
   }
+  // No gap beats an invented one: the boost dialog turns this into a claim
+  // about rank, right next to a payment button.
+  return null;
+}
+
+/**
+ * The sitting #1 of a leaderboard view and when they took the spot. Cached and
+ * invalidated with the leaderboard itself, so the two stay in step.
+ */
+export async function getCurrentLeader(
+  period: Period,
+  country: string | null,
+): Promise<CurrentLeader | null> {
+  const supabase = reader();
+  if (!supabase) return null;
+  const cached = unstable_cache(
+    async () => {
+      const { data, error } = await supabase.rpc("current_leader", {
+        p_period: period,
+        p_country: country,
+      });
+      if (error) {
+        console.error("[leaderboard] current_leader failed:", error.message);
+        return null;
+      }
+      return ((data ?? [])[0] as CurrentLeader | undefined) ?? null;
+    },
+    ["current-leader", period, country ?? "GLOBAL"],
+    { revalidate: LEADERBOARD_CACHE_SECONDS, tags: [LEADERBOARD_TAG] },
+  );
+  return cached();
+}
+
+/**
+ * When a founder holds an all-time #1 - globally, or failing that in their
+ * country - what they hold and since when. Null for everyone else.
+ */
+export async function getLeadership(
+  founderId: string,
+  ranks: FounderRanks | null,
+  countryCode: string,
+): Promise<{ label: string; since: string } | null> {
+  if (!ranks?.is_ranked) return null;
+  const scope =
+    ranks.global_rank === 1 ? null : ranks.country_rank === 1 ? countryCode : undefined;
+  if (scope === undefined) return null;
+
+  const leader = await getCurrentLeader("ALL_TIME", scope);
+  if (!leader || leader.founder_id !== founderId) return null;
   return {
-    global_gap: 300,
-    global_target_rank: 12,
-    country_gap: 120,
-    country_target_rank: 2,
+    label: scope ? `#1 in ${countryName(scope)}` : "#1 globally",
+    since: leader.started_at,
   };
 }
 
@@ -153,9 +212,16 @@ export async function getRecentActivity(limit = 8): Promise<ActivityEvent[]> {
  */
 export function invalidateLeaderboard() {
   try {
+    // Server Actions: the next render waits for fresh data.
     updateTag(LEADERBOARD_TAG);
-  } catch (error) {
-    // updateTag needs a request scope; outside one the short TTL is enough.
-    console.warn("[leaderboard] cache invalidation skipped:", error);
+  } catch {
+    try {
+      // Route Handlers - the payment callback and the webhook - may not call
+      // updateTag. expire: 0 gives the same "never serve stale" guarantee.
+      revalidateTag(LEADERBOARD_TAG, { expire: 0 });
+    } catch (error) {
+      // Outside any request scope the short TTL is enough.
+      console.warn("[leaderboard] cache invalidation skipped:", error);
+    }
   }
 }

@@ -6,10 +6,12 @@ const LINKS = [
   { href: "/about", label: "About" },
   { href: "/rules", label: "Rules" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/search", label: "Search" },
   { href: "/contact", label: "Contact" },
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
   { href: "/refunds", label: "Refunds" },
+  { href: "/shipping", label: "Shipping" },
 ];
 
 export function Footer() {

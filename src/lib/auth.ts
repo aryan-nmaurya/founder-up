@@ -19,11 +19,10 @@ export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createServerSupabase();
   if (!supabase) return null;
 
-  const { data } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
+  // Private columns (is_admin, auth_user_id, ...) are readable only through
+  // current_profile(), which returns the caller's own row. Migration 0007.
+  const { data, error } = await supabase.rpc("current_profile").maybeSingle();
+  if (error) console.error("[auth] current_profile failed:", error.message);
 
   return (data as Profile | null) ?? null;
 });

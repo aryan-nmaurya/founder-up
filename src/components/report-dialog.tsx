@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Field, Select, Textarea } from "./ui/field";
+import { Modal } from "./ui/modal";
 
 const REASONS = [
   { value: "IMPERSONATION", label: "Impersonation" },
@@ -55,17 +56,14 @@ export function ReportDialog({ profileId }: { profileId: string }) {
         Report profile
       </button>
 
-      {open ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 sm:items-center sm:p-4"
-          onClick={(e) => e.target === e.currentTarget && setOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Report profile"
-            className="w-full max-w-sm rounded-t-xl border border-border bg-white p-5 sm:rounded-xl"
-          >
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        label="Report profile"
+        className="max-w-sm rounded-t-xl border border-border bg-white p-5 sm:rounded-xl"
+      >
+        {open ? (
+          <>
             {done ? (
               <div className="text-center">
                 <p className="font-medium">Report received</p>
@@ -115,9 +113,9 @@ export function ReportDialog({ profileId }: { profileId: string }) {
                 </div>
               </form>
             )}
-          </div>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </Modal>
     </>
   );
 }

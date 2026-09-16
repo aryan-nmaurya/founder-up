@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import {
   AMOUNT_PRESETS_SUBUNIT,
+  CONTACT_EMAIL,
   CURRENCY_SYMBOL,
   MAX_AMOUNT_SUBUNIT,
   MIN_AMOUNT_SUBUNIT,
@@ -13,11 +14,26 @@ import {
 } from "@/lib/config";
 import { formatMoney, formatPoints, formatRank } from "@/lib/format";
 import { countryName, flagFor } from "@/lib/countries";
+import { cn } from "@/lib/cn";
 import { CurrencySwitcher } from "./currency-switcher";
 import { ShareRank } from "./share-rank";
+import { Modal } from "./ui/modal";
 import { track } from "@/lib/analytics-client";
-import { ArrowUp, Sparkles, X, CheckCircle2, ShieldAlert } from "lucide-react";
-import type { FounderRanks, NextRankGap } from "@/types/db";
+import {
+  ArrowUp,
+  Sparkles,
+  X,
+  CheckCircle2,
+  ShieldAlert,
+  Clock,
+  TriangleAlert,
+} from "lucide-react";
+import type {
+  BoostOutcome,
+  FounderRanks,
+  NextRankGap,
+  VerifyResponse,
+} from "@/types/db";
 
 type RazorpayHandlerResponse = {
   razorpay_order_id: string;
@@ -44,34 +60,41 @@ declare global {
   }
 }
 
-type Outcome = {
-  rank_points: number;
-  previous_global_rank: number | null;
-  new_global_rank: number | null;
-  previous_country_rank: number | null;
-  new_country_rank: number | null;
-};
+/**
+ * Once Checkout hands back a payment, the form never returns for it: money may
+ * have moved, so the only honest answers left are confirmed, still processing,
+ * or not confirmed yet.
+ */
+type Phase =
+  | { step: "form" }
+  | { step: "confirming"; payment: RazorpayHandlerResponse }
+  | { step: "success"; outcome: BoostOutcome }
+  | { step: "pending"; payment: RazorpayHandlerResponse }
+  | { step: "unconfirmed"; payment: RazorpayHandlerResponse; reason: string };
 
 export function BoostDialog({
+  founderId,
   ranks,
   gap,
   defaultCurrency = "INR",
-  founderName,
-  founderEmail,
+  payerName,
+  payerEmail,
   username,
   countryCode,
   razorpayEnabled,
   triggerLabel = "Climb the leaderboard",
   className,
 }: {
+  /** The signed-in founder. A boost only ever goes to the account that pays. */
+  founderId: string;
   ranks: FounderRanks | null;
   gap: NextRankGap | null;
   defaultCurrency?: Currency;
-  founderName: string;
-  founderEmail: string;
+  payerName: string;
+  payerEmail: string;
   username: string;
   countryCode: string;
-  razorpayEnabled?: boolean;
+  razorpayEnabled: boolean;
   triggerLabel?: string;
   className?: string;
 }) {
@@ -82,50 +105,31 @@ export function BoostDialog({
   const [custom, setCustom] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [outcome, setOutcome] = useState<Outcome | null>(null);
-  const [scriptReady, setScriptReady] = useState(false);
+  const [phase, setPhase] = useState<Phase>({ step: "form" });
 
   const presets = AMOUNT_PRESETS_SUBUNIT[currency];
   const min = MIN_AMOUNT_SUBUNIT[currency];
 
+  function close() {
+    // Mid-confirmation the dialog stays put, so the answer has somewhere to land.
+    if (phase.step === "confirming") return;
+    setOpen(false);
+    setError(null);
+    if (phase.step !== "form") {
+      setPhase({ step: "form" });
+      router.refresh();
+    }
+  }
+
+  const closeRef = useRef(close);
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open]);
+    closeRef.current = close;
+  });
 
   const estimatedPoints = useMemo(() => {
     if (currency === "INR") return Math.floor(amount / 100);
     return Math.floor((amount / 100) * USD_TO_INR_ESTIMATE);
   }, [amount, currency]);
-
-  // Dynamic estimated rank movement calculation
-  const currentCountryRank = ranks?.country_rank ?? 18;
-  const currentGlobalRank = ranks?.global_rank ?? 123;
-
-  const estimatedNewCountryRank = useMemo(() => {
-    const jump = Math.max(1, Math.min(Math.floor(estimatedPoints / 50), currentCountryRank - 1));
-    return Math.max(1, currentCountryRank - jump);
-  }, [estimatedPoints, currentCountryRank]);
-
-  const estimatedNewGlobalRank = useMemo(() => {
-    const jump = Math.max(2, Math.min(Math.floor(estimatedPoints / 25), currentGlobalRank - 1));
-    return Math.max(1, currentGlobalRank - jump);
-  }, [estimatedPoints, currentGlobalRank]);
-
-  function close() {
-    setOpen(false);
-    setError(null);
-    if (outcome) {
-      setOutcome(null);
-      router.refresh();
-    }
-  }
 
   function applyCustom(value: string) {
     setCustom(value);
@@ -135,8 +139,41 @@ export function BoostDialog({
     }
   }
 
+  async function confirm(payment: RazorpayHandlerResponse) {
+    setPhase({ step: "confirming", payment });
+    let reason = "FounderUp couldn't be reached to confirm it.";
+    try {
+      const res = await fetch("/api/boost/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payment),
+      });
+      const result = (await res
+        .json()
+        .catch(() => ({ error: "FounderUp sent an unexpected response." }))) as VerifyResponse;
+
+      if ("status" in result && result.status === "CONFIRMED") {
+        track("payment_success", { rank_points: result.outcome.rank_points, currency });
+        setPhase({ step: "success", outcome: result.outcome });
+        router.refresh();
+        return;
+      }
+      if ("status" in result && result.status === "PENDING") {
+        track("payment_pending", { currency });
+        setPhase({ step: "pending", payment });
+        return;
+      }
+      if ("error" in result && result.error) reason = result.error;
+    } catch {
+      // Network failure: the reason above stands.
+    }
+    track("payment_unconfirmed", { currency });
+    setPhase({ step: "unconfirmed", payment, reason });
+  }
+
   async function startCheckout() {
     setError(null);
+    if (!razorpayEnabled) return;
 
     if (amount < min) {
       setError(`Minimum boost is ${formatMoney(min, currency)}`);
@@ -146,40 +183,21 @@ export function BoostDialog({
       setError("That amount is above the per-boost limit");
       return;
     }
+    if (!window.Razorpay) {
+      setError("Checkout is still loading. Try again in a moment.");
+      return;
+    }
 
     setBusy(true);
     track("checkout_started", { amount_subunit: amount, currency });
-
-    // If Razorpay is not configured locally, provide seamless simulated boost
-    if (!razorpayEnabled) {
-      setTimeout(() => {
-        setBusy(false);
-        const simOutcome: Outcome = {
-          rank_points: estimatedPoints,
-          previous_global_rank: currentGlobalRank,
-          new_global_rank: estimatedNewGlobalRank,
-          previous_country_rank: currentCountryRank,
-          new_country_rank: estimatedNewCountryRank,
-        };
-        setOutcome(simOutcome);
-        track("payment_success", { rank_points: estimatedPoints, simulated: true });
-      }, 750);
-      return;
-    }
-
-    if (!scriptReady || !window.Razorpay) {
-      setError("Checkout is still loading. Try again in a moment.");
-      setBusy(false);
-      return;
-    }
 
     try {
       const res = await fetch("/api/boost/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ amount_subunit: amount, currency }),
+        body: JSON.stringify({ founder_id: founderId, amount_subunit: amount, currency }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Could not start checkout");
 
       const rzp = new window.Razorpay({
@@ -189,33 +207,12 @@ export function BoostDialog({
         currency: data.currency,
         name: "FounderUp",
         description: "Rank Points boost",
-        prefill: { name: founderName, email: founderEmail },
+        prefill: { name: payerName, email: payerEmail || undefined },
         theme: { color: "#F26A4F" },
-        handler: async (response) => {
-          try {
-            const verify = await fetch("/api/boost/verify", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify(response),
-            });
-            const result = await verify.json();
-            if (!verify.ok) throw new Error(result.error ?? "Verification failed");
-            track("payment_success", {
-              rank_points: result.outcome?.rank_points ?? null,
-              currency,
-            });
-            setOutcome(result.outcome ?? null);
-            router.refresh();
-          } catch (err) {
-            track("payment_failed", { stage: "verify", currency });
-            setError(
-              err instanceof Error
-                ? `${err.message}. If payment succeeded, your points will reflect shortly.`
-                : "Verification failed",
-            );
-          } finally {
-            setBusy(false);
-          }
+        // Checkout calls this only after it has taken the money.
+        handler: (response) => {
+          setBusy(false);
+          void confirm(response);
         },
         modal: { ondismiss: () => setBusy(false) },
       });
@@ -229,12 +226,9 @@ export function BoostDialog({
 
   return (
     <>
-      <Script
-        src="https://checkout.razorpay.com/v1/checkout.js"
-        strategy="lazyOnload"
-        onReady={() => setScriptReady(true)}
-        onLoad={() => setScriptReady(true)}
-      />
+      {razorpayEnabled ? (
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+      ) : null}
 
       <button
         type="button"
@@ -251,24 +245,59 @@ export function BoostDialog({
         <span>{triggerLabel}</span>
       </button>
 
-      {open ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-xs p-0 sm:items-center sm:p-4 animate-in fade-in duration-150"
-          onClick={(e) => e.target === e.currentTarget && close()}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Climb the leaderboard"
-            className="w-full max-w-lg rounded-t-2xl border border-border bg-white p-6 shadow-2xl sm:rounded-2xl animate-in slide-in-from-bottom-4 duration-200"
-          >
-            {outcome ? (
+      <Modal
+        open={open}
+        onClose={() => closeRef.current()}
+        label="Climb the leaderboard"
+        className="rounded-t-2xl border border-border bg-white p-6 shadow-2xl sm:rounded-2xl animate-in slide-in-from-bottom-4 duration-200"
+      >
+        {open ? (
+          <>
+            {phase.step === "success" ? (
               <SuccessPanel
-                outcome={outcome}
+                outcome={phase.outcome}
                 countryCode={countryCode}
                 username={username}
                 onClose={close}
               />
+            ) : phase.step === "confirming" ? (
+              <StatusPanel
+                tone="neutral"
+                title="Confirming your payment…"
+                paymentId={phase.payment.razorpay_payment_id}
+              >
+                <p>Checking with Razorpay. This usually takes a few seconds.</p>
+              </StatusPanel>
+            ) : phase.step === "pending" ? (
+              <StatusPanel
+                tone="neutral"
+                title="Payment received, still processing"
+                paymentId={phase.payment.razorpay_payment_id}
+                onRetry={() => confirm(phase.payment)}
+                onClose={close}
+              >
+                <p>
+                  Razorpay hasn&apos;t finished confirming it yet. Your Rank Points
+                  are added automatically as soon as it clears, so you don&apos;t
+                  need to pay again.
+                </p>
+              </StatusPanel>
+            ) : phase.step === "unconfirmed" ? (
+              <StatusPanel
+                tone="warning"
+                title="We couldn't confirm your payment yet"
+                paymentId={phase.payment.razorpay_payment_id}
+                onRetry={() => confirm(phase.payment)}
+                onClose={close}
+              >
+                <p>{phase.reason}</p>
+                <p>
+                  If you were charged, your Rank Points are added automatically
+                  once Razorpay confirms the payment. Please don&apos;t pay again.
+                  If they haven&apos;t appeared within an hour, email {CONTACT_EMAIL}{" "}
+                  with the payment ID below.
+                </p>
+              </StatusPanel>
             ) : (
               <div className="space-y-5">
                 {/* Header */}
@@ -291,30 +320,33 @@ export function BoostDialog({
                 </div>
 
                 {/* Current Rank Banner */}
-                <div className="rounded-xl border border-border bg-surface p-3.5 flex items-center justify-between">
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-subtle">
-                      Current Rank
-                    </span>
-                    <div className="mt-0.5 flex items-center gap-3 text-[15px] font-bold text-fg tabular">
-                      <span>
-                        {flagFor(countryCode)} #{currentCountryRank}{" "}
-                        <span className="font-normal text-muted text-[13px]">
-                          {countryName(countryCode)}
-                        </span>
-                      </span>
-                      <span className="text-border-strong">·</span>
-                      <span>
-                        🌍 #{currentGlobalRank}{" "}
-                        <span className="font-normal text-muted text-[13px]">
-                          Global
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-accent-subtle px-2.5 py-1 text-[11px] font-bold text-accent">
-                    Active
+                <div className="rounded-xl border border-border bg-surface p-3.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-subtle">
+                    Current Rank
                   </span>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-3 text-[15px] font-bold text-fg tabular">
+                    {!ranks ? (
+                      <span className="font-medium text-muted">Unavailable right now</span>
+                    ) : ranks.is_ranked ? (
+                      <>
+                        <span>
+                          {flagFor(countryCode)} {formatRank(ranks.country_rank)}{" "}
+                          <span className="font-normal text-muted text-[13px]">
+                            {countryName(countryCode)}
+                          </span>
+                        </span>
+                        <span className="text-border-strong">·</span>
+                        <span>
+                          🌍 {formatRank(ranks.global_rank)}{" "}
+                          <span className="font-normal text-muted text-[13px]">
+                            Global
+                          </span>
+                        </span>
+                      </>
+                    ) : (
+                      <span>Unranked</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Currency Switcher */}
@@ -368,33 +400,20 @@ export function BoostDialog({
                     type="text"
                     inputMode="decimal"
                     placeholder="Custom amount"
+                    aria-label="Custom amount"
                     value={custom}
                     onChange={(e) => applyCustom(e.target.value)}
                     className="h-11 w-full rounded-xl border border-border bg-surface pl-8 pr-4 text-[14px] font-semibold text-fg placeholder:text-subtle focus:border-accent focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent/15 tabular"
                   />
                 </div>
 
-                {/* Estimated Movement Preview */}
-                <div className="rounded-xl border border-accent/25 bg-[#FFF9F7] p-3.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-semibold text-fg">
-                      Estimated movement
-                    </span>
-                    <span className="text-[13px] font-extrabold text-accent tabular">
-                      +{formatPoints(estimatedPoints)} RP
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center gap-2 text-[14px] font-bold text-fg tabular">
-                    <span>
-                      #{currentCountryRank} →{" "}
-                      <strong className="text-positive">
-                        #{estimatedNewCountryRank}
-                      </strong>{" "}
-                      {countryName(countryCode)}
-                    </span>
-                    <ArrowUp className="h-4 w-4 text-positive" />
-                  </div>
-                </div>
+                <RankEstimate
+                  points={estimatedPoints}
+                  approximate={currency !== "INR"}
+                  ranks={ranks}
+                  gap={gap}
+                  countryCode={countryCode}
+                />
 
                 {/* Non-Refundable Disclosure */}
                 <div className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3 text-[12px] leading-relaxed text-muted">
@@ -403,6 +422,16 @@ export function BoostDialog({
                     All ranking purchases are final and non-refundable. Final position may change as other founders climb the leaderboard.
                   </p>
                 </div>
+
+                {!razorpayEnabled ? (
+                  <p
+                    role="status"
+                    className="rounded-xl border border-[#f0d8a8] bg-[#fdf8ee] px-3.5 py-2 text-[13px] font-medium text-[#7a5b12]"
+                  >
+                    Checkout isn&apos;t available on this deployment yet, so no
+                    payment can be taken.
+                  </p>
+                ) : null}
 
                 {error ? (
                   <p className="rounded-xl border border-negative/20 bg-negative/5 px-3.5 py-2 text-[13px] font-medium text-negative">
@@ -413,7 +442,7 @@ export function BoostDialog({
                 {/* CTA */}
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy || !razorpayEnabled}
                   onClick={startCheckout}
                   className="w-full h-12 rounded-xl bg-fg text-[14px] font-bold text-white shadow-xs hover:bg-black transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
@@ -427,10 +456,154 @@ export function BoostDialog({
                 </button>
               </div>
             )}
-          </div>
+          </>
+        ) : null}
+      </Modal>
+    </>
+  );
+}
+
+/**
+ * Plan §16 - what a boost this size is expected to do, from real numbers only:
+ * the founder's current rank and the gap to the next position. Whatever those
+ * can't support is left unsaid rather than guessed.
+ */
+function RankEstimate({
+  points,
+  approximate,
+  ranks,
+  gap,
+  countryCode,
+}: {
+  points: number;
+  approximate: boolean;
+  ranks: FounderRanks | null;
+  gap: NextRankGap | null;
+  countryCode: string;
+}) {
+  const country = countryName(countryCode);
+
+  function versus(needed: number, target: number, where: string): ReactNode {
+    return points >= needed ? (
+      <>
+        Enough to reach <strong className="text-positive">#{target}</strong> {where}
+      </>
+    ) : (
+      <>
+        {formatPoints(needed - points)} RP short of <strong>#{target}</strong> {where}
+      </>
+    );
+  }
+
+  let headline: ReactNode;
+  let secondary: ReactNode = null;
+  if (!ranks) {
+    headline = "No estimate while your rank is unavailable.";
+  } else if (!ranks.is_ranked) {
+    headline = "Puts you on the leaderboard.";
+  } else {
+    headline =
+      gap?.country_gap && gap.country_target_rank
+        ? versus(gap.country_gap, gap.country_target_rank, `in ${country}`)
+        : ranks.country_rank === 1
+          ? <>Adds to your lead at <strong>#1</strong> in {country}</>
+          : "Adds to your total.";
+    secondary =
+      gap?.global_gap && gap.global_target_rank
+        ? versus(gap.global_gap, gap.global_target_rank, "globally")
+        : ranks.global_rank === 1
+          ? <>Adds to your lead at <strong>#1</strong> globally</>
+          : null;
+  }
+
+  return (
+    <div className="rounded-xl border border-accent/25 bg-[#FFF9F7] p-3.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[13px] font-semibold text-fg">Estimated movement</span>
+        <span className="text-[13px] font-extrabold text-accent tabular">
+          {approximate ? "≈ " : ""}+{formatPoints(points)} RP
+        </span>
+      </div>
+      <p className="mt-1 flex items-center gap-1.5 text-[14px] font-bold text-fg tabular">
+        <ArrowUp className="h-4 w-4 shrink-0 text-positive" />
+        <span>{headline}</span>
+      </p>
+      {secondary ? (
+        <p className="mt-0.5 pl-5.5 text-[13px] font-medium text-muted tabular">{secondary}</p>
+      ) : null}
+      <p className="mt-2 text-[12px] text-muted">
+        Based on the leaderboard right now
+        {approximate ? " and an estimated exchange rate" : ""}. Other founders
+        may move before your payment clears.
+      </p>
+    </div>
+  );
+}
+
+function StatusPanel({
+  tone,
+  title,
+  paymentId,
+  children,
+  onRetry,
+  onClose,
+}: {
+  tone: "neutral" | "warning";
+  title: string;
+  paymentId: string;
+  children: ReactNode;
+  onRetry?: () => void;
+  onClose?: () => void;
+}) {
+  return (
+    <div className="space-y-4 py-2 text-center" role="status" aria-live="polite">
+      <div
+        className={cn(
+          "mx-auto flex h-14 w-14 items-center justify-center rounded-full",
+          tone === "warning" ? "bg-[#fdf8ee] text-[#7a5b12]" : "bg-surface text-fg",
+        )}
+      >
+        {tone === "warning" ? (
+          <TriangleAlert className="h-7 w-7" />
+        ) : (
+          <Clock className="h-7 w-7" />
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-[20px] font-extrabold text-fg tracking-tight">{title}</h2>
+        <div className="mt-2 space-y-2 text-[14px] leading-relaxed text-muted">
+          {children}
+        </div>
+      </div>
+
+      <p className="text-[12px] text-muted">
+        Payment ID <span className="font-mono text-fg">{paymentId}</span>
+      </p>
+
+      {onRetry || onClose ? (
+        <div className="flex gap-2 pt-1">
+          {onRetry ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="h-11 flex-1 rounded-xl bg-fg text-[13px] font-bold text-white hover:bg-black transition-colors"
+            >
+              Check again
+            </button>
+          ) : null}
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-11 flex-1 rounded-xl border border-border bg-white text-[13px] font-bold text-fg hover:bg-surface transition-colors"
+            >
+              Close
+            </button>
+          ) : null}
         </div>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -440,15 +613,15 @@ function SuccessPanel({
   username,
   onClose,
 }: {
-  outcome: Outcome;
+  outcome: BoostOutcome;
   countryCode: string;
   username: string;
   onClose: () => void;
 }) {
+  const hasBefore =
+    outcome.previous_country_rank != null && outcome.new_country_rank != null;
   const moved =
-    outcome.previous_country_rank != null &&
-    outcome.new_country_rank != null &&
-    outcome.new_country_rank < outcome.previous_country_rank;
+    hasBefore && (outcome.new_country_rank as number) < (outcome.previous_country_rank as number);
 
   return (
     <div className="text-center py-2 space-y-4">
@@ -465,10 +638,10 @@ function SuccessPanel({
         </p>
       </div>
 
-      {/* Animated Rank Movement Display */}
+      {/* Rank Movement Display */}
       <div className="mx-auto max-w-xs rounded-2xl border border-positive/30 bg-positive/5 p-4">
         <div className="flex items-center justify-center gap-3 text-[22px] font-black text-fg tabular">
-          {outcome.previous_country_rank ? (
+          {hasBefore ? (
             <>
               <span className="text-muted line-through opacity-70">
                 #{outcome.previous_country_rank}
@@ -477,16 +650,16 @@ function SuccessPanel({
               <span className="text-positive text-[26px]">
                 #{outcome.new_country_rank}
               </span>
-              <ArrowUp className="h-6 w-6 text-positive animate-bounce" />
+              {moved ? <ArrowUp className="h-6 w-6 text-positive animate-bounce" /> : null}
             </>
           ) : (
             <span className="text-positive">
-              #{outcome.new_country_rank} {flagFor(countryCode)}
+              {formatRank(outcome.new_country_rank)} {flagFor(countryCode)}
             </span>
           )}
         </div>
         <p className="mt-1 text-[12px] font-semibold text-muted">
-          New position in {countryName(countryCode)}
+          Your position in {countryName(countryCode)}
         </p>
       </div>
 

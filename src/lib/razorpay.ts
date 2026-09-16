@@ -1,11 +1,12 @@
 import "server-only";
 import crypto from "node:crypto";
-import Razorpay from "razorpay";
 import type { Currency } from "./config";
 
 const KEY_ID = process.env.RAZORPAY_KEY_ID ?? "";
 const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET ?? "";
 const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET ?? "";
+
+const RAZORPAY_API = "https://api.razorpay.com/v1";
 
 export function isRazorpayConfigured(): boolean {
   return Boolean(KEY_ID && KEY_SECRET);
@@ -15,13 +16,59 @@ export function razorpayKeyId(): string {
   return KEY_ID;
 }
 
-let client: Razorpay | null = null;
-function instance(): Razorpay {
+/**
+ * The E2E suite points the server at a stand-in Razorpay. The override only
+ * takes effect with test-mode keys, so a live deployment can never be told to
+ * trust anything other than Razorpay itself.
+ */
+function apiBase(): string {
+  const override = process.env.RAZORPAY_API_BASE_URL?.replace(/\/+$/, "");
+  if (!override) return RAZORPAY_API;
+  if (!KEY_ID.startsWith("rzp_test_")) {
+    console.error("[razorpay] RAZORPAY_API_BASE_URL ignored: it only applies to rzp_test_ keys");
+    return RAZORPAY_API;
+  }
+  return override;
+}
+
+/** A failed Razorpay API call, carrying Razorpay's own description. */
+export class RazorpayError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string | null,
+  ) {
+    super(message);
+    this.name = "RazorpayError";
+  }
+}
+
+async function razorpay<T>(path: string, post?: { body: unknown }): Promise<T> {
   if (!isRazorpayConfigured()) {
     throw new Error("Razorpay keys are not configured");
   }
-  client ??= new Razorpay({ key_id: KEY_ID, key_secret: KEY_SECRET });
-  return client;
+
+  const response = await fetch(`${apiBase()}${path}`, {
+    method: post ? "POST" : "GET",
+    headers: {
+      authorization: `Basic ${Buffer.from(`${KEY_ID}:${KEY_SECRET}`).toString("base64")}`,
+      ...(post ? { "content-type": "application/json" } : {}),
+    },
+    body: post ? JSON.stringify(post.body) : undefined,
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = (data as { error?: { code?: string; description?: string } } | null)?.error;
+    throw new RazorpayError(
+      detail?.description ?? `Razorpay responded with HTTP ${response.status}`,
+      response.status,
+      detail?.code ?? null,
+    );
+  }
+  return data as T;
 }
 
 export type CreatedOrder = {
@@ -41,14 +88,21 @@ export async function createRazorpayOrder(params: {
   founderId: string;
   boostOrderId: string;
 }): Promise<CreatedOrder> {
-  const order = await instance().orders.create({
-    amount: params.amountSubunit,
-    currency: params.currency,
-    receipt: params.boostOrderId,
-    notes: {
-      founder_id: params.founderId,
-      boost_order_id: params.boostOrderId,
-      product: "founderup_rank_boost",
+  const order = await razorpay<{
+    id: string;
+    amount: number | string;
+    currency: string;
+    receipt?: string;
+  }>("/orders", {
+    body: {
+      amount: params.amountSubunit,
+      currency: params.currency,
+      receipt: params.boostOrderId,
+      notes: {
+        founder_id: params.founderId,
+        boost_order_id: params.boostOrderId,
+        product: "founderup_rank_boost",
+      },
     },
   });
 
@@ -60,8 +114,18 @@ export async function createRazorpayOrder(params: {
   };
 }
 
-export async function fetchRazorpayPayment(paymentId: string) {
-  return instance().payments.fetch(paymentId);
+/** Razorpay's payment entity - only the fields FounderUp reads. */
+export type RazorpayPayment = {
+  id: string;
+  order_id: string | null;
+  amount: number | string;
+  currency: string;
+  base_amount?: number | string | null;
+  status: "created" | "authorized" | "captured" | "refunded" | "failed";
+};
+
+export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayPayment> {
+  return razorpay<RazorpayPayment>(`/payments/${encodeURIComponent(paymentId)}`);
 }
 
 function safeEqual(a: string, b: string): boolean {

@@ -123,6 +123,9 @@ export const boostRequestSchema = z
   .object({
     amount_subunit: z.number().int().positive(),
     currency: z.enum(["INR", "USD"]),
+    // The profile the dialog believes it is boosting. Compared with the
+    // session, never used as the target.
+    founder_id: z.string().uuid(),
   })
   .superRefine((val, ctx) => {
     const min = MIN_AMOUNT_SUBUNIT[val.currency];
